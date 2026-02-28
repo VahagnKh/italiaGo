@@ -1,0 +1,7 @@
+{
+  "name": "ItaliaGo",
+  "description": "Smart Italy travel booking platform with AI concierge, taxi tracking, and cultural discovery.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

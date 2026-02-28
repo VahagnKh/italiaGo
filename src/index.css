@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@100;200;300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", serif;
+  --font-display: "Playfair Display", serif;
+  --font-sans: "Inter", sans-serif;
+
+  --color-gold: #D4AF37;
+  --color-paper: var(--bg);
+  --color-ink: var(--text);
+  --color-card: var(--card-bg);
+  --color-border: var(--card-border);
+  --color-nav: var(--nav-bg);
+}
+
+:root {
+  --bg: #F5F2ED;
+  --text: #1A1A1A;
+  --card-bg: #FFFFFF;
+  --card-border: rgba(0, 0, 0, 0.05);
+  --btn-bg: #1A1A1A;
+  --btn-text: #FFFFFF;
+  --nav-bg: rgba(245, 242, 237, 0.8);
+  --footer-bg: #1A1A1A;
+  --footer-text: #FFFFFF;
+}
+
+.dark {
+  --bg: #0F0F0F;
+  --text: #F5F2ED;
+  --card-bg: #1A1A1A;
+  --card-border: rgba(255, 255, 255, 0.05);
+  --btn-bg: #F5F2ED;
+  --btn-text: #1A1A1A;
+  --nav-bg: rgba(15, 15, 15, 0.8);
+  --footer-bg: #F5F2ED;
+  --footer-text: #1A1A1A;
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    @apply font-sans antialiased transition-colors duration-500;
+  }
+  
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight;
+  }
+}
+
+.luxury-card {
+  background-color: var(--card-bg);
+  border-color: var(--card-border);
+  @apply rounded-2xl shadow-sm border overflow-hidden transition-all duration-500 hover:shadow-md hover:-translate-y-1;
+}
+
+.btn-luxury {
+  background-color: var(--btn-bg);
+  color: var(--btn-text);
+  @apply px-6 py-3 rounded-full font-medium transition-all duration-500 hover:opacity-90 active:scale-95;
+}
+
+.btn-outline {
+  border-color: var(--text);
+  color: var(--text);
+  @apply px-6 py-3 border rounded-full font-medium transition-all duration-500 hover:bg-ink hover:text-paper active:scale-95;
+}
+
