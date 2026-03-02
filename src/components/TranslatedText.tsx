@@ -26,6 +26,10 @@ export default function TranslatedText({ text, lang, className }: TranslatedText
       // Don't translate if text is empty
       if (!text || text.trim() === '') return;
 
+      // Add a small random delay to stagger requests further
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 2000));
+      if (!isMounted) return;
+
       setLoading(true);
       try {
         const result = await translateContent(text, lang);

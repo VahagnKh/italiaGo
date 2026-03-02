@@ -1,45 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MessageSquare, Send, X, Bot, Sparkles, Globe } from 'lucide-react';
+import { MessageSquare, Send, X, Bot, Sparkles, Globe, ChevronDown } from 'lucide-react';
 import { getTravelAdvice } from '../services/gemini';
-
-const BOT_LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇺🇸', greeting: 'Welcome! I am your ItaliaGo Concierge. How can I make your Italian escape unforgettable today?' },
-  { code: 'it', name: 'Italiano', flag: '🇮🇹', greeting: 'Benvenuto! Sono il tuo Concierge ItaliaGo. Come posso rendere indimenticabile la tua fuga italiana oggi?' },
-  { code: 'ru', name: 'Русский', flag: '🇷🇺', greeting: 'Добро пожаловать! Я ваш консьерж ItaliaGo. Как я могу сделать ваш итальянский отдых незабываемым сегодня?' },
-  { code: 'hy', name: 'Հայերեն', flag: '🇦🇲', greeting: 'Բարի գալուստ: Ես ձեր ItaliaGo կոնսիերժն եմ: Ինչպե՞ս կարող եմ ձեր իտալական հանգիստն այսօր անմոռանալի դարձնել:' },
-];
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function AIConcierge({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (open: boolean) => void }) {
-  const [selectedLang, setSelectedLang] = useState<string | null>(null);
+  const { language, setLanguage, t } = useLanguage();
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const LANGUAGES = [
+    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+    { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+    { code: 'hy', name: 'Հայերեն', flag: '🇦🇲' },
+  ];
+
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      setMessages([{ role: 'assistant', content: t.botGreeting }]);
+    }
+  }, [isOpen, t.botGreeting]);
+
+  // Update greeting if language changes and it's the only message
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].role === 'assistant') {
+      setMessages([{ role: 'assistant', content: t.botGreeting }]);
+    }
+  }, [t.botGreeting]);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, selectedLang]);
-
-  const handleLangSelect = (langCode: string) => {
-    setSelectedLang(langCode);
-    const lang = BOT_LANGUAGES.find(l => l.code === langCode);
-    if (lang) {
-      setMessages([{ role: 'assistant', content: lang.greeting }]);
-    }
-  };
+  }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || !selectedLang) return;
+    if (!input.trim()) return;
     
     const userMsg = input;
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setIsLoading(true);
 
-    const langName = BOT_LANGUAGES.find(l => l.code === selectedLang)?.name || 'English';
+    const langName = language === 'it' ? 'Italian' : language === 'ru' ? 'Russian' : language === 'hy' ? 'Armenian' : 'English';
     const promptWithLang = `Please respond in ${langName}. User says: ${userMsg}`;
 
     const response = await getTravelAdvice(promptWithLang);
@@ -51,116 +59,144 @@ export default function AIConcierge({ isOpen, setIsOpen }: { isOpen: boolean, se
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-ink text-paper rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all duration-500 z-50"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-ink text-paper rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-all duration-500 z-[60] group"
       >
-        <Bot size={24} />
+        <Bot size={24} className="group-hover:rotate-12 transition-transform" />
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full animate-ping" />
+        <span className="absolute -top-1 -right-1 w-4 h-4 bg-gold rounded-full" />
       </button>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div 
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="fixed bottom-24 right-6 w-96 h-[500px] bg-card rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col overflow-hidden z-50 border border-border transition-colors duration-500"
+            initial={{ opacity: 0, y: 100, scale: 0.95 }}
+            animate={{ 
+              opacity: 1, 
+              y: 0, 
+              scale: 1,
+              height: isExpanded ? '90vh' : '500px',
+              width: isExpanded ? '95vw' : '384px',
+              bottom: isExpanded ? '2.5vh' : '96px',
+              right: isExpanded ? '2.5vw' : '24px',
+            }}
+            exit={{ opacity: 0, y: 100, scale: 0.95 }}
+            className={`fixed z-[70] bg-card rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.2)] flex flex-col overflow-hidden border border-border transition-all duration-500 ease-out sm:max-w-md ${
+              isExpanded ? 'left-[2.5vw]' : 'left-4 sm:left-auto'
+            }`}
           >
-            <div className="bg-ink p-4 text-paper flex justify-between items-center transition-colors duration-500">
-              <div className="flex items-center gap-2">
-                <Sparkles size={18} className="text-gold" />
-                <span className="font-display text-lg">ItaliaGo Concierge</span>
+            {/* Header */}
+            <div className="bg-ink p-6 text-paper flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gold/20 rounded-xl flex items-center justify-center text-gold">
+                  <Sparkles size={20} />
+                </div>
+                <div>
+                  <h3 className="font-display text-lg leading-tight">ItaliaGo Concierge</h3>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">AI-Powered Travel Assistant</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                {selectedLang && (
+                <div className="relative">
                   <button 
-                    onClick={() => setSelectedLang(null)} 
-                    className="p-1 hover:bg-white/10 dark:hover:bg-black/10 rounded-lg transition-colors"
-                    title="Change Language"
+                    onClick={() => setShowLangMenu(!showLangMenu)}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold"
                   >
                     <Globe size={16} />
+                    <span>{LANGUAGES.find(l => l.code === language)?.flag}</span>
                   </button>
-                )}
-                <button onClick={() => setIsOpen(false)} className="hover:opacity-70">
+                  <AnimatePresence>
+                    {showLangMenu && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-32 bg-card rounded-xl shadow-2xl border border-border overflow-hidden z-50 p-1"
+                      >
+                        {LANGUAGES.map(l => (
+                          <button
+                            key={l.code}
+                            onClick={() => { setLanguage(l.code as any); setShowLangMenu(false); }}
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-bold transition-colors ${language === l.code ? 'bg-gold text-white' : 'text-ink hover:bg-paper'}`}
+                          >
+                            <span>{l.flag}</span>
+                            <span>{l.name}</span>
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+                <button 
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors hidden sm:block"
+                >
+                  {isExpanded ? <ChevronDown size={20} /> : <div className="w-5 h-5 border-2 border-white/40 rounded-sm" />}
+                </button>
+                <button 
+                  onClick={() => setIsOpen(false)} 
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
                   <X size={20} />
                 </button>
               </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-paper/50 transition-colors duration-500">
-              {!selectedLang ? (
-                <div className="h-full flex flex-col items-center justify-center space-y-8">
-                  <div className="relative">
-                    <div className="absolute -inset-4 bg-gold/20 blur-2xl rounded-full animate-pulse" />
-                    <Bot size={64} className="relative text-ink" />
+            {/* Messages */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-paper/30 scroll-smooth">
+              {messages.map((msg, i) => (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  key={i} 
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'user' 
+                      ? 'bg-ink text-paper rounded-tr-none shadow-lg' 
+                      : 'bg-card border border-border text-ink rounded-tl-none shadow-sm'
+                  }`}>
+                    {msg.content}
                   </div>
-                  <div className="text-center space-y-2">
-                    <p className="text-lg font-display italic text-ink">Benvenuti</p>
-                    <p className="text-xs font-bold uppercase tracking-widest text-ink/60">
-                      Select your language
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 w-full max-w-[280px]">
-                    {BOT_LANGUAGES.map(l => (
-                      <button
-                        key={l.code}
-                        onClick={() => handleLangSelect(l.code)}
-                        className="flex flex-col items-center gap-3 p-4 rounded-2xl border border-border bg-card hover:border-gold hover:shadow-lg transition-all group shadow-sm"
-                      >
-                        <span className="text-3xl group-hover:scale-110 transition-transform">{l.flag}</span>
-                        <span className="text-xs font-bold text-ink tracking-wider">{l.name}</span>
-                      </button>
-                    ))}
+                </motion.div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-card border border-border p-4 rounded-2xl rounded-tl-none shadow-sm">
+                    <div className="flex gap-1.5">
+                      {[0, 1, 2].map(i => (
+                        <motion.div 
+                          key={i}
+                          animate={{ y: [0, -4, 0] }}
+                          transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
+                          className="w-1.5 h-1.5 bg-gold rounded-full" 
+                        />
+                      ))}
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <>
-                  {messages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] p-3 rounded-2xl text-sm transition-colors duration-500 ${
-                        msg.role === 'user' 
-                          ? 'bg-ink text-paper rounded-tr-none shadow-md' 
-                          : 'bg-card border border-border text-ink rounded-tl-none shadow-sm'
-                      }`}>
-                        {msg.content}
-                      </div>
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-white dark:bg-white/10 border border-black/5 dark:border-white/5 p-3 rounded-2xl rounded-tl-none transition-colors duration-500">
-                        <motion.div 
-                          animate={{ opacity: [0.4, 1, 0.4] }}
-                          transition={{ repeat: Infinity, duration: 1.5 }}
-                          className="flex gap-1"
-                        >
-                          <div className="w-1.5 h-1.5 bg-ink/30 dark:bg-white/30 rounded-full" />
-                          <div className="w-1.5 h-1.5 bg-ink/30 dark:bg-white/30 rounded-full" />
-                          <div className="w-1.5 h-1.5 bg-ink/30 dark:bg-white/30 rounded-full" />
-                        </motion.div>
-                      </div>
-                    </div>
-                  )}
-                </>
               )}
             </div>
 
-            {selectedLang && (
-              <div className="p-4 border-t border-border bg-card flex gap-2 transition-colors duration-500">
+            {/* Input */}
+            <div className="p-6 border-t border-border bg-card shrink-0">
+              <div className="relative flex items-center gap-3">
                 <input 
                   type="text" 
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Ask your concierge..."
-                  className="flex-1 bg-paper/50 border border-border rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-ink outline-none text-ink transition-all duration-500"
+                  placeholder={t.botPlaceholder}
+                  className="flex-1 bg-paper/50 border border-border rounded-2xl px-6 py-4 text-sm focus:ring-1 focus:ring-gold outline-none text-ink transition-all placeholder:text-ink/30"
                 />
                 <button 
                   onClick={handleSend}
-                  className="w-10 h-10 bg-ink text-paper rounded-full flex items-center justify-center hover:opacity-90 transition-all duration-500"
+                  disabled={!input.trim() || isLoading}
+                  className="w-12 h-12 bg-ink text-paper rounded-2xl flex items-center justify-center hover:bg-gold transition-all disabled:opacity-50 disabled:hover:bg-ink shadow-lg"
                 >
-                  <Send size={16} />
+                  <Send size={18} />
                 </button>
               </div>
-            )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

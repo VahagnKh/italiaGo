@@ -37,24 +37,25 @@ export async function getTravelAdvice(prompt: string, context?: string) {
 const translationCache: Record<string, string> = {};
 const requestQueue: (() => Promise<void>)[] = [];
 let isProcessingQueue = false;
+let isPaused = false;
 
 async function processQueue() {
-  if (isProcessingQueue || requestQueue.length === 0) return;
+  if (isProcessingQueue || requestQueue.length === 0 || isPaused) return;
   isProcessingQueue = true;
   
-  while (requestQueue.length > 0) {
+  while (requestQueue.length > 0 && !isPaused) {
     const task = requestQueue.shift();
     if (task) {
       await task();
-      // Wait a bit between requests to avoid hitting rate limits
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Increased delay to 4s between requests to respect strict rate limits
+      await new Promise(resolve => setTimeout(resolve, 4000));
     }
   }
   
   isProcessingQueue = false;
 }
 
-export async function translateContent(text: string, targetLang: string) {
+export async function translateContent(text: string, targetLang: string, retryCount = 0): Promise<string> {
   if (!text || text.trim() === '') return text;
   
   const cacheKey = `${targetLang}:${text}`;
@@ -82,9 +83,26 @@ export async function translateContent(text: string, targetLang: string) {
         translationCache[cacheKey] = translated;
         resolve(translated);
       } catch (error: any) {
-        console.error("Translation Error:", error);
-        // If it's a 429, we don't cache it so we can try again later, but we resolve with original text for now
-        resolve(text);
+        const errorMsg = error?.message || '';
+        const isRateLimit = errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED');
+        
+        if (isRateLimit) {
+          console.warn("Global translation rate limit hit. Pausing queue for 15s...");
+          isPaused = true;
+          
+          if (retryCount < 3) {
+            setTimeout(() => {
+              isPaused = false;
+              translateContent(text, targetLang, retryCount + 1).then(resolve);
+              processQueue();
+            }, 15000);
+          } else {
+            resolve(text);
+          }
+        } else {
+          console.error("Translation Error:", error);
+          resolve(text);
+        }
       }
     };
 

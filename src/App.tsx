@@ -1,660 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Calendar, Star, ArrowRight, Utensils, Hotel, Car, Compass, Sparkles, Globe, Map as MapIcon, X, ShoppingBag, Trash2, Sun, Moon, User, Lock, Mail, LogOut, Menu, Heart } from 'lucide-react';
+import { 
+  MapPin, 
+  Calendar, 
+  Star, 
+  ArrowRight, 
+  Utensils, 
+  Hotel, 
+  Car, 
+  Compass, 
+  Sparkles, 
+  Globe, 
+  Map as MapIcon, 
+  X, 
+  ShoppingBag, 
+  Trash2, 
+  Sun, 
+  Moon, 
+  User, 
+  Lock, 
+  Mail, 
+  LogOut, 
+  Menu, 
+  Heart,
+  VolumeX,
+  Briefcase,
+  Baby,
+  Dog,
+  MessageSquare,
+  LayoutDashboard
+} from 'lucide-react';
 
-const LANGUAGES = [
-  { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'hy', name: 'Հայերեն', flag: '🇦🇲' },
-  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-];
-
-const TRANSLATIONS: Record<string, any> = {
-  it: {
-    hotels: 'Hotel',
-    restaurants: 'Ristoranti',
-    tours: 'Tour',
-    taxi: 'Taxi',
-    discover: 'Scopri l\'Italia in modo più intelligente',
-    companion: 'Il tuo compagno di fiducia per viaggi indimenticabili in tutta Italia.',
-    start: 'Inizia il tuo viaggio',
-    featured: 'Destinazioni in primo piano',
-    wallet: 'Portafoglio',
-    bonus: 'Bonus',
-    filter: 'Filtra per',
-    all: 'Tutti',
-    more: 'Scopri di più',
-    close: 'Chiudi',
-    basket: 'Cestino',
-    addToBasket: 'Aggiungi al cestino',
-    priceRange: 'Prezzo',
-    low: 'Economico',
-    medium: 'Medio',
-    high: 'Lusso',
-    checkout: 'Pagamento',
-    emptyBasket: 'Il tuo cestino è vuoto',
-    experiences: 'Esperienze',
-    rentals: 'Noleggi',
-    events: 'Eventi',
-    stories: 'Storie di Viaggio',
-    reviews: 'Recensioni',
-    leaveReview: 'Lascia una recensione',
-    rating: 'Valutazione',
-    comment: 'Commento',
-    submit: 'Invia',
-    noReviews: 'Ancora nessuna recensione.',
-  },
-  en: {
-    hotels: 'Hotels',
-    restaurants: 'Restaurants',
-    tours: 'Tours',
-    taxi: 'Taxi',
-    discover: 'Discover Italy Smarter',
-    companion: 'Your trusted companion for unforgettable journeys across Italy.',
-    start: 'Start Your Journey',
-    featured: 'Featured Destinations',
-    wallet: 'Wallet',
-    bonus: 'Bonus',
-    filter: 'Filter by',
-    all: 'All',
-    more: 'See More Info',
-    close: 'Close',
-    basket: 'Basket',
-    addToBasket: 'Add to Basket',
-    priceRange: 'Price',
-    low: 'Budget',
-    medium: 'Mid-range',
-    high: 'Luxury',
-    checkout: 'Checkout',
-    emptyBasket: 'Your basket is empty',
-    experiences: 'Experiences',
-    rentals: 'Rentals',
-    events: 'Events',
-    stories: 'Travel Stories',
-    reviews: 'Reviews',
-    leaveReview: 'Leave a Review',
-    rating: 'Rating',
-    comment: 'Comment',
-    submit: 'Submit',
-    noReviews: 'No reviews yet.',
-  },
-  hy: {
-    hotels: 'Հյուրանոցներ',
-    restaurants: 'Ռեստորաններ',
-    tours: 'Տուրեր',
-    taxi: 'Տաքսի',
-    discover: 'Բացահայտեք Իտալիան ավելի խելացի',
-    companion: 'Ձեր վստահելի ուղեկիցը Իտալիայում անմոռանալի ճանապարհորդությունների համար:',
-    start: 'Սկսեք ձեր ճանապարհորդությունը',
-    featured: 'Առաջարկվող ուղղություններ',
-    wallet: 'Քսակ',
-    bonus: 'Բոնուս',
-    filter: 'Ֆիլտրել ըստ',
-    all: 'Բոլորը',
-    more: 'Տեսնել ավելին',
-    close: 'Փակել',
-    basket: 'Զամբյուղ',
-    addToBasket: 'Ավելացնել զամբյուղում',
-    priceRange: 'Գին',
-    low: 'Էժան',
-    medium: 'Միջին',
-    high: 'Թանկ',
-    checkout: 'Վճարում',
-    emptyBasket: 'Ձեր զամբյուղը դատարկ է',
-    experiences: 'Փորձառություններ',
-    rentals: 'Վարձույթ',
-    events: 'Միջոցառումներ',
-    stories: 'Ճամփորդական պատմություններ',
-    reviews: 'Կարծիքներ',
-    leaveReview: 'Թողնել կարծիք',
-    rating: 'Գնահատական',
-    comment: 'Մեկնաբանություն',
-    submit: 'Ուղարկել',
-    noReviews: 'Դեռևս կարծիքներ չկան:',
-  },
-  ru: {
-    hotels: 'Отели',
-    restaurants: 'Рестораны',
-    tours: 'Туры',
-    taxi: 'Такси',
-    discover: 'Откройте Италию умнее',
-    companion: 'Ваш надежный спутник для незабываемых путешествий по всей Италии.',
-    start: 'Начать путешествие',
-    featured: 'Популярные направления',
-    wallet: 'Кошелек',
-    bonus: 'Бонус',
-    filter: 'Фильтр по',
-    all: 'Все',
-    more: 'Подробнее',
-    close: 'Закрыть',
-    basket: 'Корзина',
-    addToBasket: 'В корзину',
-    priceRange: 'Цена',
-    low: 'Бюджетно',
-    medium: 'Средне',
-    high: 'Люкс',
-    checkout: 'Оплата',
-    emptyBasket: 'Ваша корзина пуста',
-    experiences: 'Впечатления',
-    rentals: 'Аренда',
-    events: 'События',
-    stories: 'Истории путешествий',
-    reviews: 'Отзывы',
-    leaveReview: 'Оставить отзыв',
-    rating: 'Рейтинг',
-    comment: 'Комментарий',
-    submit: 'Отправить',
-    noReviews: 'Отзывов пока нет.',
-  }
-};
-
-const HOTELS = [
-  { 
-    id: 'h1', 
-    name: 'Hotel Danieli', 
-    location: 'Venice', 
-    price: 850, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/danieli/800/600', 
-    stars: 5,
-    description: 'A legendary hotel in the heart of Venice, offering breathtaking views of the lagoon and unparalleled luxury.',
-    amenities: ['Spa', 'Fine Dining', 'Private Dock', 'Concierge'],
-    history: 'Built in the 14th century as a palace for the Dandolo family, it has hosted royalty and celebrities for centuries. The hotel consists of three buildings: the 14th-century Palazzo Dandolo, the 19th-century Palazzo Casa Nuova, and the 20th-century Palazzo Danieli Excelsior. It was the first hotel in Venice to have an elevator.'
-  },
-  { 
-    id: 'h2', 
-    name: 'Grand Hotel Tremezzo', 
-    location: 'Lake Como', 
-    price: 1200, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/tremezzo/800/600', 
-    stars: 5,
-    description: 'An iconic Art Nouveau masterpiece on the shores of Lake Como, featuring floating pools and lush gardens.',
-    amenities: ['Floating Pool', 'Private Beach', 'Luxury Spa', 'Gourmet Dining'],
-    history: 'Opened in 1910, it remains one of the most prestigious hotels in the world, capturing the essence of the Belle Époque. It was built for the social elite of Europe and has been family-owned for generations. The hotel is famous for its "T Spa" and the stunning views of Bellagio.'
-  },
-  { 
-    id: 'h3', 
-    name: 'Belmond Hotel Splendido', 
-    location: 'Portofino', 
-    price: 1500, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/splendido/800/600', 
-    stars: 5,
-    description: 'Perched on a hillside overlooking the harbor of Portofino, this former monastery is the epitome of Italian glamour.',
-    amenities: ['Infinity Pool', 'Terrace Dining', 'Private Boat Tours', 'Wellness Center'],
-    history: 'Originally a 16th-century monastery, it was converted into a villa and later a hotel that became a favorite of Hollywood stars like Elizabeth Taylor and Richard Burton. The hotel is renowned for its lush Mediterranean gardens and its "La Terrazza" restaurant, which offers some of the best views in Italy.'
-  },
-  { 
-    id: 'h4', 
-    name: 'Hotel Artemide', 
-    location: 'Rome', 
-    price: 350, 
-    priceLevel: 'medium',
-    image: 'https://picsum.photos/seed/artemide/800/600', 
-    stars: 4,
-    description: 'A charming 19th-century building on Via Nazionale, offering modern comfort and a rooftop bar with views of the city.',
-    amenities: ['Rooftop Bar', 'Free Minibar', 'Spa', 'Gym'],
-    history: 'Housed in a beautiful 19th-century building, Hotel Artemide combines classical Roman architecture with contemporary design. It is located in the heart of the city, making it a perfect base for exploring the nearby Colosseum and Roman Forum.'
-  },
-  { 
-    id: 'h5', 
-    name: 'Ostello Bello', 
-    location: 'Milan', 
-    price: 80, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/ostello/800/600', 
-    stars: 3,
-    description: 'A vibrant and award-winning hostel in the center of Milan, perfect for budget travelers looking for a social atmosphere.',
-    amenities: ['Bar', 'Shared Kitchen', 'Live Music', 'Terrace'],
-    history: 'Founded by a group of travelers, Ostello Bello has redefined the hostel experience in Italy. It is located just steps away from the Duomo and has become a hub for international travelers and locals alike.'
-  },
-  { 
-    id: 'h6', 
-    name: 'Hotel San Marco', 
-    location: 'Rome', 
-    price: 120, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/sanmarco/800/600', 
-    stars: 3,
-    description: 'A comfortable 3-star hotel located near Termini Station, offering easy access to all of Rome\'s major attractions.',
-    amenities: ['Free Wi-Fi', 'Breakfast Included', 'Air Conditioning', '24h Reception'],
-    history: 'A family-run establishment that has been welcoming guests for over 30 years, known for its friendly service and clean rooms.'
-  },
-  { 
-    id: 'h7', 
-    name: 'Albergo Firenze', 
-    location: 'Florence', 
-    price: 110, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/firenze/800/600', 
-    stars: 3,
-    description: 'Located in the heart of Florence, just steps from the Duomo, this hotel offers a classic Tuscan experience at an affordable price.',
-    amenities: ['Central Location', 'Traditional Decor', 'Breakfast Buffet', 'Pet Friendly'],
-    history: 'Housed in a historic building, this hotel preserves the charm of old Florence while providing modern amenities for today\'s travelers.'
-  },
-  { 
-    id: 'h8', 
-    name: 'Hotel Minerva', 
-    location: 'Siena', 
-    price: 130, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/minerva/800/600', 
-    stars: 3,
-    description: 'A cozy hotel with stunning views of Siena\'s historic center, perfect for exploring the medieval city.',
-    amenities: ['Panoramic Terrace', 'Bar', 'Meeting Room', 'Parking'],
-    history: 'Originally a private residence, it was converted into a hotel in the mid-20th century and has since become a favorite for those seeking a quiet retreat.'
-  },
-];
-
-const RESTAURANTS = [
-  { 
-    id: 'r1', 
-    name: 'Osteria Francescana', 
-    location: 'Modena', 
-    chef: 'Massimo Bottura', 
-    price: 300,
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/osteria/800/600', 
-    stars: 5,
-    michelinStars: 3,
-    description: 'Consistently ranked among the best in the world, this restaurant reinvents traditional Italian cuisine with artistic flair.',
-    specialty: 'Oops! I Dropped the Lemon Tart',
-    history: 'Founded in 1995, it has become a global culinary destination under the visionary leadership of Chef Massimo Bottura. The restaurant is located in the historic center of Modena and is famous for its innovative approach to traditional Emilian ingredients.'
-  },
-  { 
-    id: 'r2', 
-    name: 'La Pergola', 
-    location: 'Rome', 
-    chef: 'Heinz Beck', 
-    price: 250,
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/pergola/800/600', 
-    stars: 5,
-    michelinStars: 3,
-    description: 'The only three-Michelin-starred restaurant in Rome, offering panoramic views of the Eternal City and exquisite Mediterranean dishes.',
-    specialty: 'Fagotelli La Pergola',
-    history: 'Located atop the Rome Cavalieri hotel, it has been a pinnacle of Roman fine dining since its opening. Chef Heinz Beck has led the kitchen since 1994, earning international acclaim for his light and creative Mediterranean cuisine.'
-  },
-  { 
-    id: 'r3', 
-    name: 'Enoteca Pinchiorri', 
-    location: 'Florence', 
-    chef: 'Annie Féolde', 
-    price: 280,
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/enoteca/800/600', 
-    stars: 5,
-    michelinStars: 3,
-    description: 'A temple of gastronomy in Florence, known for its legendary wine cellar and innovative Tuscan cuisine.',
-    specialty: 'Risotto with Saffron and Gold Leaf',
-    history: 'Starting as a wine bar in the 1970s, it evolved into a world-renowned restaurant under Annie Féolde and Giorgio Pinchiorri. It is housed in the historic Palazzo Ciofi-Jacometti and boasts one of the most impressive wine collections in the world.'
-  },
-  { 
-    id: 'r4', 
-    name: 'Da Vittorio', 
-    location: 'Bergamo', 
-    chef: 'Cerea Family', 
-    price: 200,
-    priceLevel: 'medium',
-    image: 'https://picsum.photos/seed/vittorio/800/600', 
-    stars: 4,
-    michelinStars: 3,
-    description: 'A family-run institution near Bergamo, famous for its seafood and warm hospitality.',
-    specialty: 'Paccheri alla Vittorio',
-    history: 'Opened in 1966 by Vittorio Cerea and his wife Bruna, the restaurant has been a symbol of Italian excellence for over 50 years. It is now run by their children, who continue the tradition of high-quality ingredients and impeccable service.'
-  },
-  { 
-    id: 'r5', 
-    name: 'Pizzeria da Michele', 
-    location: 'Naples', 
-    chef: 'Condurro Family', 
-    price: 15,
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/michele/800/600', 
-    stars: 3,
-    description: 'The most famous pizzeria in the world, serving only two types of pizza: Margherita and Marinara.',
-    specialty: 'Pizza Margherita',
-    history: 'Founded in 1870, L\'Antica Pizzeria da Michele is a place of pilgrimage for pizza lovers. It was featured in the movie "Eat Pray Love" and continues to serve the same authentic Neapolitan pizza that has made it a legend.'
-  },
-  { 
-    id: 'r6', 
-    name: 'Trattoria da Mario', 
-    location: 'Florence', 
-    chef: 'Mario Rossi', 
-    price: 25,
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/mario/800/600', 
-    stars: 3,
-    description: 'A bustling, traditional trattoria known for its authentic Florentine steak and lively atmosphere.',
-    specialty: 'Bistecca alla Fiorentina',
-    history: 'Since 1953, Da Mario has been a staple of the Florentine dining scene, serving simple, high-quality Tuscan dishes to locals and tourists alike.'
-  },
-  { 
-    id: 'r7', 
-    name: 'Hostaria da Pietro', 
-    location: 'Rome', 
-    chef: 'Pietro Mancini', 
-    price: 35,
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/pietro/800/600', 
-    stars: 3,
-    description: 'A classic Roman hostaria near Piazza del Popolo, offering traditional Roman pasta dishes in a cozy setting.',
-    specialty: 'Cacio e Pepe',
-    history: 'A family-run restaurant that prides itself on using seasonal ingredients and traditional recipes passed down through generations.'
-  },
-  { 
-    id: 'r8', 
-    name: 'Trattoria del Pesce', 
-    location: 'Bari', 
-    chef: 'Antonio Esposito', 
-    price: 40,
-    priceLevel: 'medium',
-    image: 'https://picsum.photos/seed/pesce/800/600', 
-    stars: 3,
-    description: 'A local favorite in Bari, serving the freshest seafood caught daily from the Adriatic Sea.',
-    specialty: 'Crudo di Pesce',
-    history: 'Located near the old harbor, this trattoria has been the go-to spot for seafood lovers in Puglia for decades.'
-  },
-];
-
-const TOURS = [
-  { 
-    id: 't1', 
-    name: 'Vatican Museums Private Tour', 
-    location: 'Rome',
-    duration: '4h', 
-    price: 250, 
-    priceLevel: 'medium',
-    image: 'https://picsum.photos/seed/vatican/800/600',
-    stars: 5,
-    description: 'Skip the lines and explore the Sistine Chapel and St. Peter\'s Basilica with an expert art historian.',
-    highlights: ['Sistine Chapel', 'Raphael Rooms', 'St. Peter\'s Basilica'],
-    info: 'This exclusive tour provides deep insights into the Papal collections and the masterpieces of the Renaissance. You will learn about the history of the Vatican City and the artistic genius of Michelangelo and Raphael.'
-  },
-  { 
-    id: 't2', 
-    name: 'Amalfi Coast Boat Charter', 
-    location: 'Amalfi',
-    duration: 'Full Day', 
-    price: 1200, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/amalfi/800/600',
-    stars: 5,
-    description: 'Sail along the stunning Amalfi Coast on a private yacht, stopping at Positano, Amalfi, and hidden coves.',
-    highlights: ['Positano View', 'Emerald Grotto', 'Private Swimming'],
-    info: 'Experience the Mediterranean like never before, with a professional skipper and local aperitifs on board. The tour includes stops at the most picturesque villages and the opportunity to swim in crystal-clear waters.'
-  },
-  { 
-    id: 't3', 
-    name: 'Chianti Wine Tasting', 
-    location: 'Tuscany',
-    duration: '6h', 
-    price: 180, 
-    priceLevel: 'medium',
-    image: 'https://picsum.photos/seed/chianti/800/600',
-    stars: 4,
-    description: 'Visit historic vineyards in the heart of Tuscany and sample world-class Chianti Classico wines.',
-    highlights: ['Vineyard Walk', 'Cellar Tour', 'Gourmet Lunch'],
-    info: 'Learn the secrets of Tuscan winemaking and enjoy a traditional lunch paired with local vintages. You will visit a family-owned estate and discover the history of the Gallo Nero (Black Rooster) symbol of Chianti Classico.'
-  },
-  { 
-    id: 't4', 
-    name: 'Colosseum Underground Tour', 
-    location: 'Rome',
-    duration: '3h', 
-    price: 95, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/colosseum/800/600',
-    stars: 4,
-    description: 'Explore the restricted areas of the Colosseum, including the underground tunnels where gladiators prepared for battle.',
-    highlights: ['Underground Tunnels', 'Arena Floor', 'Third Tier'],
-    info: 'Step back in time and discover the inner workings of the world\'s most famous amphitheater. This tour offers a unique perspective on the engineering and social history of ancient Rome.'
-  },
-  { 
-    id: 't5', 
-    name: 'Venice Walking Tour', 
-    location: 'Venice',
-    duration: '2h', 
-    price: 45, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/venicewalk/800/600',
-    stars: 3,
-    description: 'A guided walk through the labyrinthine streets of Venice, discovering hidden gems and historic landmarks.',
-    highlights: ['St. Mark\'s Square', 'Rialto Bridge', 'Hidden Courtyards'],
-    info: 'Learn about the history and legends of the Floating City from a local guide who knows every corner of Venice.'
-  },
-  { 
-    id: 't6', 
-    name: 'Pompeii Express Tour', 
-    location: 'Pompeii',
-    duration: '2h', 
-    price: 55, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/pompeii/800/600',
-    stars: 3,
-    description: 'A fast-paced tour of the ancient city of Pompeii, frozen in time by the eruption of Mt. Vesuvius.',
-    highlights: ['Forum', 'Thermal Baths', 'Ancient Villas'],
-    info: 'Perfect for those with limited time, this tour covers the most important sites of the archaeological park.'
-  },
-  { 
-    id: 't7', 
-    name: 'Siena Medieval History Tour', 
-    location: 'Siena',
-    duration: '2.5h', 
-    price: 50, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/sienatour/800/600',
-    stars: 3,
-    description: 'Discover the rich medieval heritage of Siena, from the Piazza del Campo to the stunning Duomo.',
-    highlights: ['Piazza del Campo', 'Siena Cathedral', 'Medieval Streets'],
-    info: 'Explore the history of the Palio and the rivalries between Siena\'s historic contrade.'
-  },
-];
-
-const EXPERIENCES = [
-  { 
-    id: 'e1', 
-    name: 'Private Cooking Class', 
-    location: 'Florence',
-    duration: '3h', 
-    price: 150, 
-    priceLevel: 'medium',
-    image: 'https://picsum.photos/seed/cooking/800/600',
-    stars: 5,
-    description: 'Learn to make authentic pasta and tiramisu in a private kitchen with a local chef.',
-    highlights: ['Handmade Pasta', 'Local Ingredients', 'Wine Pairing'],
-    info: 'Master the secrets of Italian home cooking in an intimate setting. You will prepare a three-course meal and enjoy it with local wines.'
-  },
-  { 
-    id: 'e2', 
-    name: 'Opera Night at Arena di Verona', 
-    location: 'Verona',
-    duration: '4h', 
-    price: 200, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/opera/800/600',
-    stars: 5,
-    description: 'Experience a world-class opera performance in a stunning Roman amphitheater.',
-    highlights: ['Historic Venue', 'Top Performers', 'Magical Atmosphere'],
-    info: 'The Arena di Verona is one of the best-preserved Roman structures and hosts a prestigious opera festival every summer.'
-  },
-  { 
-    id: 'e3', 
-    name: 'Gelato Making Workshop', 
-    location: 'Rome',
-    duration: '1.5h', 
-    price: 45, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/gelato/800/600',
-    stars: 3,
-    description: 'Discover the art of making real Italian gelato with traditional methods and fresh ingredients.',
-    highlights: ['Artisanal Techniques', 'Tasting Session', 'Recipe Book'],
-    info: 'A fun and interactive workshop for all ages, where you\'ll learn the difference between gelato and ice cream.'
-  },
-  { 
-    id: 'e4', 
-    name: 'Street Food Tour', 
-    location: 'Palermo',
-    duration: '3h', 
-    price: 55, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/streetfood/800/600',
-    stars: 3,
-    description: 'Explore the vibrant markets of Palermo and taste the best street food Sicily has to offer.',
-    highlights: ['Arancine', 'Panelle', 'Local Markets'],
-    info: 'A culinary journey through the heart of Palermo, discovering the history and culture behind its famous street food.'
-  },
-];
-
-const RENTALS = [
-  { 
-    id: 'rn1', 
-    name: 'Ferrari Portofino Rental', 
-    location: 'Milan',
-    duration: '24h', 
-    price: 1500, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/ferrari/800/600',
-    stars: 5,
-    description: 'Drive the ultimate Italian supercar through the scenic roads of Northern Italy.',
-    highlights: ['V8 Engine', 'Convertible', 'Italian Style'],
-    info: 'Experience the thrill of driving a Ferrari. Perfect for a day trip to Lake Como or the Italian Alps.'
-  },
-  { 
-    id: 'rn2', 
-    name: 'Vintage Vespa Rental', 
-    location: 'Rome',
-    duration: 'Day Trip', 
-    price: 75, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/vespa/800/600',
-    stars: 4,
-    description: 'Explore the Eternal City like a local on a classic Italian scooter.',
-    highlights: ['Iconic Design', 'Easy Parking', 'City Freedom'],
-    info: 'Zip through Roman traffic and discover hidden corners of the city that cars can\'t reach.'
-  },
-  { 
-    id: 'rn3', 
-    name: 'Fiat 500 Vintage Rental', 
-    location: 'Florence',
-    duration: '24h', 
-    price: 120, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/fiat500/800/600',
-    stars: 3,
-    description: 'Drive a classic Fiat 500 through the rolling hills of Tuscany for a truly nostalgic experience.',
-    highlights: ['Retro Charm', 'Manual Gearbox', 'Perfect for Photos'],
-    info: 'The quintessential Italian car, perfect for exploring the countryside at a leisurely pace.'
-  },
-  { 
-    id: 'rn4', 
-    name: 'Electric City Bike Rental', 
-    location: 'Milan',
-    duration: 'Full Day', 
-    price: 35, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/ebike/800/600',
-    stars: 3,
-    description: 'An eco-friendly way to see Milan, with powerful electric assistance for effortless riding.',
-    highlights: ['Sustainable Travel', 'Lightweight', 'Extended Range'],
-    info: 'Explore Milan\'s parks and historic center without breaking a sweat.'
-  },
-  { 
-    id: 'rn5', 
-    name: 'Compact Economy Car', 
-    location: 'Naples',
-    duration: '24h', 
-    price: 60, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/economycar/800/600',
-    stars: 3,
-    description: 'A reliable and fuel-efficient car for budget-conscious travelers exploring Southern Italy.',
-    highlights: ['Fuel Efficient', 'Easy to Drive', 'Air Conditioning'],
-    info: 'A practical choice for navigating the narrow streets and coastal roads of the Amalfi Coast.'
-  },
-];
-
-const EVENTS = [
-  { 
-    id: 'ev1', 
-    name: 'Venice Carnival Masquerade', 
-    location: 'Venice',
-    duration: 'Night', 
-    price: 500, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/venice-carnival/800/600',
-    stars: 5,
-    description: 'Attend an exclusive masquerade ball in a historic Venetian palace.',
-    highlights: ['Luxury Costumes', 'Gourmet Dinner', 'Live Music'],
-    info: 'The Venice Carnival is one of the most famous festivals in the world, known for its elaborate masks and historical reenactments.'
-  },
-  { 
-    id: 'ev2', 
-    name: 'Milan Fashion Week Pass', 
-    location: 'Milan',
-    duration: 'Full Day', 
-    price: 2000, 
-    priceLevel: 'high',
-    image: 'https://picsum.photos/seed/milan-fashion/800/600',
-    stars: 5,
-    description: 'Get exclusive access to top designer runway shows and after-parties.',
-    highlights: ['Front Row Seats', 'VIP Access', 'Networking'],
-    info: 'Milan Fashion Week is a global event where the world\'s leading designers showcase their latest collections.'
-  },
-  { 
-    id: 'ev3', 
-    name: 'Local Sagra (Food Festival)', 
-    location: 'Tuscany',
-    duration: 'Evening', 
-    price: 30, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/sagra/800/600',
-    stars: 3,
-    description: 'Join a traditional village food festival celebrating local seasonal products.',
-    highlights: ['Authentic Food', 'Folk Music', 'Community Spirit'],
-    info: 'Sagras are a fundamental part of Italian rural life, offering a chance to taste traditional dishes at affordable prices.'
-  },
-  { 
-    id: 'ev4', 
-    name: 'Open Air Cinema Night', 
-    location: 'Rome',
-    duration: 'Night', 
-    price: 15, 
-    priceLevel: 'low',
-    image: 'https://picsum.photos/seed/cinema/800/600',
-    stars: 3,
-    description: 'Watch a classic Italian film under the stars in a historic Roman piazza.',
-    highlights: ['Classic Films', 'Stunning Setting', 'Summer Vibes'],
-    info: 'A popular summer activity in Rome, where historic squares are transformed into outdoor cinemas.'
-  },
-];
-
-const STORIES = [
-  {
-    id: 's1',
-    title: 'A Sunset in Positano',
-    author: 'Elena Rossi',
-    image: 'https://picsum.photos/seed/positano-story/800/1000',
-    excerpt: 'The sky turned a deep shade of orange as the sun dipped below the horizon, painting the colorful houses of Positano in a magical light...'
-  },
-  {
-    id: 's2',
-    title: 'The Secret Gardens of Rome',
-    author: 'Marco Bianchi',
-    image: 'https://picsum.photos/seed/rome-story/800/1000',
-    excerpt: 'Hidden behind high stone walls and ancient gates, Rome\'s secret gardens offer a peaceful escape from the bustling city streets...'
-  },
-  {
-    id: 's3',
-    title: 'Truffle Hunting in Piedmont',
-    author: 'Sofia Conti',
-    image: 'https://picsum.photos/seed/truffle-story/800/1000',
-    excerpt: 'Following the expert nose of a truffle dog through the misty woods of Piedmont is an experience like no other...'
-  }
-];
+import { useLanguage } from './contexts/LanguageContext';
+import AdminView from './components/AdminView';
 import AIConcierge from './components/AIConcierge';
 import TranslatedText from './components/TranslatedText';
+
+const LANGUAGES = [
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'it', name: 'Italiano', flag: '🇮🇹' },
+  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
+  { code: 'hy', name: 'Հայերեն', flag: '🇦🇲' },
+];
 
 const DESTINATIONS = [
   {
@@ -680,10 +67,38 @@ const DESTINATIONS = [
   }
 ];
 
+const STORIES = [
+  {
+    id: 's1',
+    title: 'A Sunset in Positano',
+    author: 'Elena Rossi',
+    image: 'https://picsum.photos/seed/positano-story/800/1000',
+    excerpt: 'The sky turned a deep shade of orange as the sun dipped below the horizon, painting the colorful houses of Positano in a magical light...'
+  },
+  {
+    id: 's2',
+    title: 'The Secret Gardens of Rome',
+    author: 'Marco Bianchi',
+    image: 'https://picsum.photos/seed/rome-story/800/1000',
+    excerpt: 'Hidden behind high stone walls and ancient gates, Rome\'s secret gardens offer a peaceful escape from the bustling city streets...'
+  },
+  {
+    id: 's3',
+    title: 'Truffle Hunting in Piedmont',
+    author: 'Sofia Conti',
+    image: 'https://picsum.photos/seed/truffle-story/800/1000',
+    excerpt: 'Following the expert nose of a truffle dog through the misty woods of Piedmont is an experience like no other...'
+  }
+];
+
 export default function App() {
+  const { language: lang, setLanguage: setLang, t } = useLanguage();
   const [view, setView] = useState<'home' | 'dashboard' | 'checkout' | 'hotels' | 'restaurants' | 'tours' | 'taxi' | 'experiences' | 'rentals' | 'events'>('home');
+  const [initialFilter, setInitialFilter] = useState('all');
+  const [initialPriceFilter, setInitialPriceFilter] = useState('all');
+  const [initialSearch, setInitialSearch] = useState('');
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [lang, setLang] = useState('it');
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [basket, setBasket] = useState<any[]>([]);
   const [showBasket, setShowBasket] = useState(false);
@@ -697,9 +112,41 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showAI, setShowAI] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [infoModal, setInfoModal] = useState<{ title: string, content: string } | null>(null);
+  const [listings, setListings] = useState<any[]>([]);
 
-  const t = TRANSLATIONS[lang] || TRANSLATIONS.it;
+  useEffect(() => {
+    fetch('/api/listings')
+      .then(res => res.json())
+      .then(data => setListings(data))
+      .catch(err => console.error(err));
+  }, []);
+
+  const HOTELS = listings.filter(l => l.type === 'hotel');
+  const RESTAURANTS = listings.filter(l => l.type === 'restaurant');
+  const TOURS = listings.filter(l => l.type === 'tour');
+  const EXPERIENCES = listings.filter(l => l.type === 'experience');
+  const RENTALS = listings.filter(l => l.type === 'rental');
+  const EVENTS = listings.filter(l => l.type === 'event');
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 500);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const refreshUser = async () => {
+    try {
+      const res = await fetch('/api/user');
+      const data = await res.json();
+      setUser(data);
+    } catch (err) {
+      console.error('Failed to refresh user:', err);
+    }
+  };
 
   const addToBasket = (item: any) => {
     setBasket(prev => [...prev, { ...item, basketId: Math.random().toString(36).substr(2, 9) }]);
@@ -733,28 +180,38 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navbar */}
-      <nav className="fixed top-0 w-full z-40 bg-nav backdrop-blur-md border-b border-border px-6 py-4 flex justify-between items-center transition-colors">
-        <div className="flex items-center gap-2 sm:gap-4">
+      <nav className="fixed top-0 w-full z-40 bg-nav backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center transition-colors">
+        <div className="flex items-center gap-1 sm:gap-4">
           <button 
             onClick={() => setShowMobileMenu(!showMobileMenu)}
             className="lg:hidden p-2 text-ink/60 hover:bg-paper/50 rounded-full transition-colors"
           >
-            {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
+            {showMobileMenu ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('home')}>
-            <div className="w-8 h-8 bg-ink rounded-lg flex items-center justify-center text-paper font-display font-bold shrink-0">I</div>
-            <span className="font-display text-lg sm:text-xl font-bold tracking-tight text-ink whitespace-nowrap">ItaliaGo</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 cursor-pointer" onClick={() => setView('home')}>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-ink rounded-lg flex items-center justify-center text-paper font-display font-bold shrink-0 text-sm sm:text-base">I</div>
+            <span className="font-display text-base sm:text-xl font-bold tracking-tight text-ink whitespace-nowrap">{t.title}</span>
           </div>
         </div>
         
         <div className="hidden lg:flex items-center gap-4 xl:gap-8 text-[10px] xl:text-xs font-bold uppercase tracking-widest text-ink/60">
-          <button onClick={() => setView('hotels')} className={`hover:text-ink transition-colors ${view === 'hotels' ? 'text-ink' : ''}`}>{t.hotels}</button>
-          <button onClick={() => setView('restaurants')} className={`hover:text-ink transition-colors ${view === 'restaurants' ? 'text-ink' : ''}`}>{t.restaurants}</button>
-          <button onClick={() => setView('experiences')} className={`hover:text-ink transition-colors ${view === 'experiences' ? 'text-ink' : ''}`}>{t.experiences}</button>
-          <button onClick={() => setView('tours')} className={`hover:text-ink transition-colors ${view === 'tours' ? 'text-ink' : ''}`}>{t.tours}</button>
-          <button onClick={() => setView('rentals')} className={`hover:text-ink transition-colors ${view === 'rentals' ? 'text-ink' : ''}`}>{t.rentals}</button>
-          <button onClick={() => setView('events')} className={`hover:text-ink transition-colors ${view === 'events' ? 'text-ink' : ''}`}>{t.events}</button>
-          <button onClick={() => setView('taxi')} className={`hover:text-ink transition-colors ${view === 'taxi' ? 'text-ink' : ''}`}>{t.taxi}</button>
+          <button onClick={() => { setView('hotels'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'hotels' ? 'text-ink' : ''}`}>{t.hotels}</button>
+          <button onClick={() => { setView('restaurants'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'restaurants' ? 'text-ink' : ''}`}>{t.restaurants}</button>
+          <button onClick={() => { setView('experiences'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'experiences' ? 'text-ink' : ''}`}>{t.experiences}</button>
+          <button onClick={() => { setView('tours'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'tours' ? 'text-ink' : ''}`}>{t.tours}</button>
+          <button onClick={() => { setView('rentals'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'rentals' ? 'text-ink' : ''}`}>{t.rentals}</button>
+          <button onClick={() => { setView('events'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'events' ? 'text-ink' : ''}`}>{t.events}</button>
+          <button onClick={() => { setView('taxi'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'taxi' ? 'text-ink' : ''}`}>{t.taxi}</button>
+          {user?.role === 'admin' && (
+            <button 
+              onClick={() => setView('home')} 
+              onDoubleClick={() => setShowAdmin(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-ink text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gold transition-colors"
+            >
+              <LayoutDashboard size={14} />
+              Admin
+            </button>
+          )}
         </div>
 
         <AnimatePresence>
@@ -765,25 +222,34 @@ export default function App() {
               exit={{ opacity: 0, x: -100 }}
               className="fixed top-[73px] left-0 w-64 h-[calc(100vh-73px)] bg-card border-r border-border p-6 flex flex-col gap-6 z-50 lg:hidden"
             >
-              <button onClick={() => { setView('hotels'); setShowMobileMenu(false); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.hotels}</button>
-              <button onClick={() => { setView('restaurants'); setShowMobileMenu(false); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.restaurants}</button>
-              <button onClick={() => { setView('experiences'); setShowMobileMenu(false); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.experiences}</button>
-              <button onClick={() => { setView('tours'); setShowMobileMenu(false); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.tours}</button>
-              <button onClick={() => { setView('rentals'); setShowMobileMenu(false); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.rentals}</button>
-              <button onClick={() => { setView('events'); setShowMobileMenu(false); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.events}</button>
-              <button onClick={() => { setView('taxi'); setShowMobileMenu(false); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.taxi}</button>
+              <button onClick={() => { setView('hotels'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.hotels}</button>
+              <button onClick={() => { setView('restaurants'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.restaurants}</button>
+              <button onClick={() => { setView('experiences'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.experiences}</button>
+              <button onClick={() => { setView('tours'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.tours}</button>
+              <button onClick={() => { setView('rentals'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.rentals}</button>
+              <button onClick={() => { setView('events'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.events}</button>
+              <button onClick={() => { setView('taxi'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.taxi}</button>
+              {user?.role === 'admin' && (
+                <button 
+                  onClick={() => { setShowAdmin(true); setShowMobileMenu(false); }} 
+                  className="flex items-center gap-2 text-left text-sm font-bold uppercase tracking-widest text-gold"
+                >
+                  <LayoutDashboard size={18} />
+                  Admin Panel
+                </button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <div className="relative">
             <button 
               onClick={() => setShowBasket(!showBasket)}
-              className="relative p-2 rounded-full border border-border hover:bg-paper transition-colors text-ink"
+              className="relative p-1.5 sm:p-2 rounded-full border border-border hover:bg-paper transition-colors text-ink"
             >
-              <ShoppingBag size={18} />
+              <ShoppingBag size={16} className="sm:w-[18px] sm:h-[18px]" />
               {basket.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-gold text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 sm:w-4 sm:h-4 bg-gold text-white text-[9px] sm:text-[10px] font-bold rounded-full flex items-center justify-center">
                   {basket.length}
                 </span>
               )}
@@ -845,9 +311,9 @@ export default function App() {
           <div className="relative">
             <button 
               onClick={() => setShowLangMenu(!showLangMenu)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-border hover:bg-paper transition-colors text-sm text-ink"
+              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-border hover:bg-paper transition-colors text-xs sm:text-sm text-ink"
             >
-              <Globe size={14} />
+              <Globe size={12} className="sm:w-[14px] sm:h-[14px]" />
               <span>{LANGUAGES.find(l => l.code === lang)?.flag}</span>
             </button>
             
@@ -878,48 +344,51 @@ export default function App() {
 
           <div className="relative">
             {user ? (
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-1.5 sm:gap-4">
               <button 
                 onClick={() => setView('dashboard')}
-                className="flex items-center gap-2 p-1 sm:px-4 sm:py-2 rounded-full border border-border hover:bg-paper transition-colors"
+                className="flex items-center gap-1.5 p-1 sm:px-4 sm:py-2 rounded-full border border-border hover:bg-paper transition-colors"
               >
-                <div className="w-8 h-8 sm:w-6 sm:h-6 bg-gold rounded-full flex items-center justify-center text-[10px] text-white font-bold shrink-0">
+                <div className="w-7 h-7 sm:w-6 sm:h-6 bg-gold rounded-full flex items-center justify-center text-[9px] sm:text-[10px] text-white font-bold shrink-0">
                   {user.name.split(' ').map((n: any) => n[0]).join('')}
                 </div>
-                <span className="hidden sm:inline text-sm font-medium text-ink truncate max-w-[100px]">{user.name}</span>
+                <span className="hidden sm:inline text-sm font-medium text-ink truncate max-w-[80px]">{user.name}</span>
               </button>
               <button 
                 onClick={() => setUser(null)}
-                className="p-2 text-ink/40 hover:text-red-500 transition-colors"
+                className="p-1.5 text-ink/40 hover:text-red-500 transition-colors"
                 title="Logout"
               >
-                <LogOut size={16} />
+                <LogOut size={14} className="sm:w-[16px] sm:h-[16px]" />
               </button>
             </div>
           ) : (
-            <button onClick={() => setShowAuthModal(true)} className="btn-luxury text-[10px] sm:text-sm px-4 py-2 sm:px-6 sm:py-3">Sign In</button>
+            <button onClick={() => setShowAuthModal(true)} className="btn-luxury text-[9px] sm:text-sm px-3 py-2 sm:px-6 sm:py-3 whitespace-nowrap">Sign In</button>
           )}
           </div>
         </div>
       </nav>
 
       <main className="flex-1 pt-20">
-        {view === 'home' && <HomeView setView={setView} t={t} lang={lang} setInfoModal={setInfoModal} />}
-        {view === 'dashboard' && <DashboardView user={user} t={t} favorites={favorites} onRemoveFavorite={toggleFavorite} />}
-        {view === 'checkout' && <CheckoutView setView={setView} basket={basket} basketTotal={basketTotal} onPaymentSuccess={() => setBasket([])} />}
-        {view === 'hotels' && <ListView items={HOTELS} type="hotel" title={t.hotels} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} />}
-        {view === 'restaurants' && <ListView items={RESTAURANTS} type="restaurant" title={t.restaurants} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} />}
-        {view === 'experiences' && <ListView items={EXPERIENCES} type="experience" title={t.experiences} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} />}
-        {view === 'tours' && <ListView items={TOURS} type="tour" title={t.tours} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} />}
-        {view === 'rentals' && <ListView items={RENTALS} type="rental" title={t.rentals} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} />}
-        {view === 'events' && <ListView items={EVENTS} type="event" title={t.events} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} />}
-        {view === 'taxi' && <TaxiView t={t} lang={lang} />}
+        {view === 'home' && <HomeView setView={setView} t={t} lang={lang} setInfoModal={setInfoModal} setInitialFilter={setInitialFilter} />}
+        {view === 'dashboard' && <DashboardView user={user} t={t} favorites={favorites} onRemoveFavorite={toggleFavorite} refreshUser={refreshUser} />}
+        {view === 'checkout' && <CheckoutView setView={setView} basket={basket} basketTotal={basketTotal} onPaymentSuccess={() => { setBasket([]); refreshUser(); }} user={user} />}
+        {view === 'hotels' && <ListView items={HOTELS} type="hotel" title={t.hotels} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+        {view === 'restaurants' && <ListView items={RESTAURANTS} type="restaurant" title={t.restaurants} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+        {view === 'experiences' && <ListView items={EXPERIENCES} type="experience" title={t.experiences} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+        {view === 'tours' && <ListView items={TOURS} type="tour" title={t.tours} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+        {view === 'rentals' && <ListView items={RENTALS} type="rental" title={t.rentals} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+        {view === 'events' && <ListView items={EVENTS} type="event" title={t.events} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+        {view === 'taxi' && <TaxiView t={t} lang={lang} user={user} refreshUser={refreshUser} />}
+        {showAdmin && user?.role === 'admin' && (
+          <AdminView onClose={() => setShowAdmin(false)} />
+        )}
       </main>
 
       <footer className="bg-ink text-paper py-12 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="space-y-4">
-            <h3 className="font-display text-2xl">ItaliaGo</h3>
+            <h3 className="font-display text-2xl">{t.title}</h3>
             <p className="text-paper/60 text-sm leading-relaxed">
               Crafting unforgettable Italian experiences through technology and heritage.
             </p>
@@ -938,10 +407,10 @@ export default function App() {
           <div>
             <h4 className="font-bold text-xs uppercase tracking-widest mb-6 text-gold">Explore</h4>
             <ul className="space-y-3 text-sm text-paper/60">
-              <li><button onClick={() => { setView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-paper">Destinations</button></li>
-              <li><button onClick={() => setView('hotels')} className="hover:text-paper">Luxury Stays</button></li>
-              <li><button onClick={() => setView('experiences')} className="hover:text-paper">Culinary Tours</button></li>
-              <li><button onClick={() => setView('taxi')} className="hover:text-paper">Private Transport</button></li>
+              <li><button onClick={() => { setView('home'); setTimeout(() => document.getElementById('destinations')?.scrollIntoView({ behavior: 'smooth' }), 100); }} className="hover:text-paper">Destinations</button></li>
+              <li><button onClick={() => { setView('hotels'); setInitialFilter('all'); setInitialPriceFilter('high'); setInitialSearch(''); }} className="hover:text-paper">Luxury Stays</button></li>
+              <li><button onClick={() => { setView('experiences'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch('Culinary'); }} className="hover:text-paper">Culinary Tours</button></li>
+              <li><button onClick={() => { setView('taxi'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="hover:text-paper">Private Transport</button></li>
             </ul>
           </div>
           <div>
@@ -964,21 +433,6 @@ export default function App() {
                 Join
               </button>
             </div>
-            
-            <div className="mt-8 pt-8 border-t border-border">
-              <h4 className="font-bold text-[10px] uppercase tracking-widest mb-4 text-gold">Language</h4>
-              <div className="flex flex-wrap gap-2">
-                {LANGUAGES.map(l => (
-                  <button
-                    key={l.code}
-                    onClick={() => setLang(l.code)}
-                    className={`px-3 py-1 rounded-full border text-[10px] font-bold transition-all ${lang === l.code ? 'bg-gold border-gold text-white' : 'border-border text-paper/60 hover:border-paper'}`}
-                  >
-                    {l.flag} {l.name}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
         <div className="max-w-7xl mx-auto mt-12 pt-8 border-t border-border flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-paper/40">
@@ -991,7 +445,24 @@ export default function App() {
         </div>
       </footer>
 
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-8 right-8 w-12 h-12 bg-gold text-white rounded-full shadow-2xl flex items-center justify-center z-[100] hover:scale-110 transition-transform"
+          >
+            <ArrowRight size={20} className="-rotate-90" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       <AIConcierge isOpen={showAI} setIsOpen={setShowAI} />
+      <AnimatePresence>
+        {showAdmin && <AdminView onClose={() => { setShowAdmin(false); fetch('/api/listings').then(res => res.json()).then(data => setListings(data)); }} />}
+      </AnimatePresence>
       
       <AnimatePresence>
         {infoModal && (
@@ -1041,7 +512,7 @@ export default function App() {
   );
 }
 
-function HomeView({ setView, t, lang, setInfoModal }: { setView: any, t: any, lang: string, setInfoModal: any }) {
+function HomeView({ setView, t, lang, setInfoModal, setInitialFilter }: { setView: any, t: any, lang: string, setInfoModal: any, setInitialFilter: (f: string) => void }) {
   return (
     <div className="space-y-20 pb-20">
       {/* Hero */}
@@ -1057,7 +528,7 @@ function HomeView({ setView, t, lang, setInfoModal }: { setView: any, t: any, la
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-4xl sm:text-6xl md:text-8xl font-display italic leading-tight"
+            className="text-3xl sm:text-6xl md:text-8xl font-display italic leading-tight"
           >
             {t.discover}
           </motion.h1>
@@ -1075,15 +546,26 @@ function HomeView({ setView, t, lang, setInfoModal }: { setView: any, t: any, la
             transition={{ delay: 0.4 }}
             className="pt-8"
           >
-            <button 
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              animate={{ 
+                boxShadow: ["0px 0px 0px rgba(212, 175, 55, 0)", "0px 0px 20px rgba(212, 175, 55, 0.3)", "0px 0px 0px rgba(212, 175, 55, 0)"]
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
               onClick={() => {
                 const el = document.getElementById('services');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }} 
-              className="px-10 py-4 bg-ink text-paper rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl"
+              className="group px-10 py-4 bg-ink text-paper rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl flex items-center gap-3 mx-auto"
             >
               {t.start}
-            </button>
+              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+            </motion.button>
           </motion.div>
         </div>
       </section>
@@ -1112,8 +594,13 @@ function HomeView({ setView, t, lang, setInfoModal }: { setView: any, t: any, la
         ))}
       </section>
 
+      {/* Suggestions */}
+      <section className="max-w-7xl mx-auto px-6">
+        <Suggestions t={t} />
+      </section>
+
       {/* Destinations */}
-      <section className="max-w-7xl mx-auto px-6 space-y-12">
+      <section id="destinations" className="max-w-7xl mx-auto px-6 space-y-12">
         <div className="flex justify-between items-end">
           <div className="space-y-2">
             <h2 className="text-4xl md:text-5xl font-display italic text-ink">{t.featured}</h2>
@@ -1128,6 +615,11 @@ function HomeView({ setView, t, lang, setInfoModal }: { setView: any, t: any, la
             <motion.div 
               key={i}
               whileHover={{ scale: 1.02 }}
+              onClick={() => {
+                setInitialFilter(dest.name);
+                setView('hotels');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               className="group relative h-[500px] rounded-3xl overflow-hidden shadow-lg cursor-pointer"
             >
               <img src={dest.image} alt={dest.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
@@ -1204,24 +696,285 @@ function HomeView({ setView, t, lang, setInfoModal }: { setView: any, t: any, la
   );
 }
 
-function DashboardView({ user, t, favorites, onRemoveFavorite }: { user: any, t: any, favorites: any[], onRemoveFavorite: (item: any) => void }) {
+function TicTacToe({ user, onWin, t }: { user: any, onWin: () => void, t: any }) {
+  const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
+  const [isXNext, setIsXNext] = useState(true);
+  const [winner, setWinner] = useState<string | null>(null);
+  const [mode, setMode] = useState<'bot' | 'online' | null>(null);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [mySymbol, setMySymbol] = useState<string | null>(null);
+  const [isMyTurn, setIsMyTurn] = useState(false);
+  const [status, setStatus] = useState<'waiting' | 'playing' | 'gameOver' | 'idle'>('idle');
+
+  const calculateWinner = (squares: (string | null)[]) => {
+    const lines = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+    for (let i = 0; i < lines.length; i++) {
+      const [a, b, c] = lines[i];
+      if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) return squares[a];
+    }
+    return squares.includes(null) ? null : 'draw';
+  };
+
+  const minimax = (board: (string | null)[], depth: number, isMaximizing: boolean): number => {
+    const result = calculateWinner(board);
+    if (result === 'O') return 10 - depth;
+    if (result === 'X') return depth - 10;
+    if (result === 'draw') return 0;
+
+    if (isMaximizing) {
+      let bestScore = -Infinity;
+      for (let i = 0; i < 9; i++) {
+        if (board[i] === null) {
+          board[i] = 'O';
+          let score = minimax(board, depth + 1, false);
+          board[i] = null;
+          bestScore = Math.max(score, bestScore);
+        }
+      }
+      return bestScore;
+    } else {
+      let bestScore = Infinity;
+      for (let i = 0; i < 9; i++) {
+        if (board[i] === null) {
+          board[i] = 'X';
+          let score = minimax(board, depth + 1, true);
+          board[i] = null;
+          bestScore = Math.min(score, bestScore);
+        }
+      }
+      return bestScore;
+    }
+  };
+
+  const handleBotMove = (currentBoard: (string | null)[]) => {
+    let bestScore = -Infinity;
+    let move = -1;
+    const tempBoard = [...currentBoard];
+
+    for (let i = 0; i < 9; i++) {
+      if (tempBoard[i] === null) {
+        tempBoard[i] = 'O';
+        let score = minimax(tempBoard, 0, false);
+        tempBoard[i] = null;
+        if (score > bestScore) {
+          bestScore = score;
+          move = i;
+        }
+      }
+    }
+
+    if (move !== -1) {
+      const newBoard = [...currentBoard];
+      newBoard[move] = 'O';
+      setBoard(newBoard);
+      setIsXNext(true);
+      const win = calculateWinner(newBoard);
+      if (win) setWinner(win);
+    }
+  };
+
+  const handleClick = (i: number) => {
+    if (winner || board[i]) return;
+
+    if (mode === 'bot') {
+      if (!isXNext) return;
+      const newBoard = [...board];
+      newBoard[i] = 'X';
+      setBoard(newBoard);
+      setIsXNext(false);
+      const win = calculateWinner(newBoard);
+      if (win) {
+        setWinner(win);
+      } else {
+        setTimeout(() => handleBotMove(newBoard), 500);
+      }
+    } else if (mode === 'online' && socket && isMyTurn) {
+      socket.send(JSON.stringify({ type: 'move', index: i }));
+    }
+  };
+
+  useEffect(() => {
+    if (winner === 'X' || (mode === 'online' && winner === 'you')) {
+      onWin();
+    }
+  }, [winner]);
+
+  const startOnline = () => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}`);
+    setSocket(ws);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'join', roomId: 'global' }));
+    };
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'waiting') setStatus('waiting');
+      if (msg.type === 'start') {
+        setMySymbol(msg.symbol);
+        setIsMyTurn(msg.turn);
+        setStatus('playing');
+        setBoard(Array(9).fill(null));
+      }
+      if (msg.type === 'update') {
+        setBoard(msg.board);
+        setIsMyTurn(msg.turn);
+      }
+      if (msg.type === 'gameOver') {
+        setWinner(msg.winner);
+        setStatus('gameOver');
+      }
+      if (msg.type === 'opponentLeft') {
+        alert('Opponent left the game.');
+        reset();
+      }
+    };
+  };
+
+  const reset = () => {
+    setBoard(Array(9).fill(null));
+    setIsXNext(true);
+    setWinner(null);
+    setMode(null);
+    if (socket) socket.close();
+    setSocket(null);
+    setStatus('idle');
+  };
+
+  if (['Normal'].includes(user.status)) {
+    return (
+      <div className="bg-paper/30 rounded-3xl p-12 text-center border border-dashed border-border space-y-4">
+        <Lock size={48} className="mx-auto text-ink/10" />
+        <h3 className="text-xl font-display italic text-ink">Access Restricted</h3>
+        <p className="text-sm text-ink/60">You need <span className="text-gold font-bold">Advanced</span> status or higher to play the minigame and earn discounts.</p>
+        <p className="text-[10px] text-ink/40 uppercase tracking-widest">Current Status: {user.status}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-card rounded-[2.5rem] border border-border p-8 shadow-sm space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="space-y-1">
+          <h3 className="text-2xl font-display italic text-ink">Tic Tac Toe Challenge</h3>
+          {mode === 'bot' && <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 flex items-center gap-1"><Sparkles size={10} /> Difficulty: Impossible</span>}
+        </div>
+        {mode && <button onClick={reset} className="text-xs font-bold uppercase tracking-widest text-gold hover:underline">Change Mode</button>}
+      </div>
+
+      {!mode ? (
+        <div className="grid grid-cols-2 gap-4">
+          <button onClick={() => setMode('bot')} className="btn-luxury py-8 flex flex-col items-center gap-3">
+            <Compass size={32} />
+            <span>Play vs Bot</span>
+          </button>
+          <button onClick={startOnline} className="btn-outline py-8 flex flex-col items-center gap-3">
+            <Globe size={32} />
+            <span>Play Online</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {status === 'waiting' ? (
+            <div className="text-center py-12 space-y-4">
+              <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-ink/60 italic">Waiting for an opponent...</p>
+            </div>
+          ) : (
+            <>
+              <div className="text-center">
+                <p className="text-sm font-bold uppercase tracking-widest text-ink/40">
+                  {winner ? (winner === 'draw' ? "It's a Draw!" : (winner === 'X' || winner === 'you' ? "You Won! 10% Discount Earned!" : "You Lost! Try Again.")) : (mode === 'online' ? (isMyTurn ? "Your Turn" : "Opponent's Turn") : (isXNext ? "Your Turn" : "Bot's Turn"))}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3 max-w-[300px] mx-auto">
+                {board.map((cell, i) => (
+                  <motion.button
+                    key={i}
+                    whileHover={{ scale: cell ? 1 : 1.05 }}
+                    whileTap={{ scale: cell ? 1 : 0.95 }}
+                    onClick={() => handleClick(i)}
+                    className={`h-24 rounded-2xl flex items-center justify-center text-4xl font-display transition-all border shadow-sm ${
+                      cell === 'X' ? 'bg-ink text-paper border-ink' : 
+                      cell === 'O' ? 'bg-gold text-white border-gold' : 
+                      'bg-paper text-ink/20 hover:text-ink/40 border-border'
+                    }`}
+                  >
+                    {cell && (
+                      <motion.span
+                        initial={{ scale: 0, rotate: -45 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                      >
+                        {cell}
+                      </motion.span>
+                    )}
+                  </motion.button>
+                ))}
+              </div>
+              {winner && (
+                <button onClick={reset} className="w-full btn-luxury py-4 mt-4">Play Again</button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { user: any, t: any, favorites: any[], onRemoveFavorite: (item: any) => void, refreshUser: () => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
+  const [offers, setOffers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'bookings' | 'favorites'>('bookings');
+  const [isRedeeming, setIsRedeeming] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/bookings')
       .then(res => res.json())
       .then(data => setBookings(data));
+    
+    fetch('/api/offers')
+      .then(res => res.json())
+      .then(data => setOffers(data));
   }, []);
 
-  if (!user) return <div className="p-20 text-center text-ink/60">Loading your dashboard...</div>;
+  if (!user) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-24 text-center">
+        <h2 className="text-2xl font-display italic text-ink">Please log in to view your dashboard.</h2>
+      </div>
+    );
+  }
+
+  const handleRedeem = async (offer: any) => {
+    if (user.bonus < offer.discountPoints) {
+      alert('Insufficient bonus points');
+      return;
+    }
+
+    setIsRedeeming(offer.id);
+    try {
+      const res = await fetch('/api/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offerId: offer.id, points: offer.discountPoints })
+      });
+      if (res.ok) {
+        alert(`Successfully redeemed! You saved €${offer.discountValue} on ${offer.name}. Your voucher code is: ITALIA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`);
+        refreshUser();
+      }
+    } catch (err) {
+      console.error('Redemption failed:', err);
+    } finally {
+      setIsRedeeming(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-1">
-          <h1 className="text-4xl text-ink">Bentornato, {user.name}</h1>
-          <p className="text-ink/60">Manage your bookings and rewards.</p>
+          <h1 className="text-2xl sm:text-4xl text-ink">Bentornato, {user.name}</h1>
+          <p className="text-sm sm:text-base text-ink/60">Manage your bookings and rewards.</p>
         </div>
         <div className="flex gap-4">
           <div className="bg-card p-6 rounded-2xl shadow-sm border border-border flex flex-col items-center min-w-[150px]">
@@ -1248,12 +1001,50 @@ function DashboardView({ user, t, favorites, onRemoveFavorite }: { user: any, t:
         >
           Favorites ({favorites.length})
         </button>
+        <button 
+          onClick={() => setActiveTab('market')}
+          className={`px-8 py-4 text-sm font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'market' ? 'border-gold text-ink' : 'border-transparent text-ink/40'}`}
+        >
+          Bonus Market
+        </button>
+        <button 
+          onClick={() => setActiveTab('game')}
+          className={`px-8 py-4 text-sm font-bold uppercase tracking-widest transition-all border-b-2 flex items-center gap-2 ${activeTab === 'game' ? 'border-gold text-ink' : 'border-transparent text-ink/40'}`}
+        >
+          Minigame
+          {!user.last_game_win && user.status !== 'Normal' && (
+            <span className="flex h-2 w-2 rounded-full bg-gold animate-pulse" />
+          )}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          {activeTab === 'bookings' ? (
+          {activeTab === 'bookings' && (
             <>
+              {!user.last_game_win && user.status !== 'Normal' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-gold/10 border border-gold/20 rounded-3xl p-6 mb-8 flex items-center justify-between gap-6"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-gold/20 rounded-2xl flex items-center justify-center text-gold">
+                      <Sparkles size={24} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-ink">Win a 10% Discount!</h4>
+                      <p className="text-xs text-ink/60">Challenge the bot or play online to save on your next booking.</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('game')}
+                    className="px-6 py-3 bg-ink text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gold transition-colors"
+                  >
+                    Play Now
+                  </button>
+                </motion.div>
+              )}
               <h2 className="text-2xl font-display italic text-ink">Recent Bookings</h2>
               <div className="bg-card rounded-3xl border border-border overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
@@ -1308,7 +1099,8 @@ function DashboardView({ user, t, favorites, onRemoveFavorite }: { user: any, t:
                 </div>
               </div>
             </>
-          ) : (
+          )}
+          {activeTab === 'favorites' && (
             <>
               <h2 className="text-2xl font-display italic text-ink">Your Favorites</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -1348,28 +1140,110 @@ function DashboardView({ user, t, favorites, onRemoveFavorite }: { user: any, t:
               </div>
             </>
           )}
+          {activeTab === 'market' && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-display italic text-ink">Bonus Market</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {offers.map((offer) => (
+                  <div key={offer.id} className="luxury-card group">
+                    <div className="h-48 overflow-hidden relative">
+                      <img src={offer.image} alt={offer.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      <div className="absolute top-4 right-4 bg-gold text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
+                        Save €{offer.discountValue}
+                      </div>
+                    </div>
+                    <div className="p-6 space-y-4 bg-card">
+                      <div>
+                        <h4 className="font-bold text-lg text-ink">{offer.name}</h4>
+                        <p className="text-xs text-ink/40 uppercase tracking-widest">{offer.type}</p>
+                      </div>
+                      <div className="flex justify-between items-center pt-4 border-t border-border">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Cost</span>
+                          <span className="font-bold text-gold">{offer.discountPoints} Points</span>
+                        </div>
+                        <button 
+                          onClick={() => handleRedeem(offer)}
+                          disabled={isRedeeming === offer.id || user.bonus < offer.discountPoints}
+                          className={`px-6 py-3 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${
+                            user.bonus >= offer.discountPoints 
+                              ? 'bg-ink text-paper hover:bg-gold' 
+                              : 'bg-paper text-ink/20 cursor-not-allowed'
+                          }`}
+                        >
+                          {isRedeeming === offer.id ? 'Redeeming...' : 'Redeem Now'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {offers.length === 0 && (
+                  <div className="col-span-full py-20 text-center space-y-4 bg-paper/30 rounded-[2.5rem] border border-dashed border-border">
+                    <Sparkles size={48} className="mx-auto text-ink/10" />
+                    <p className="text-ink/40 italic">No special offers available right now. Keep exploring Italy!</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {activeTab === 'game' && (
+            <TicTacToe 
+              user={user} 
+              t={t} 
+              onWin={() => {
+                fetch('/api/game-win', { method: 'POST' }).then(() => refreshUser());
+              }} 
+            />
+          )}
         </div>
 
         <div className="space-y-6">
-          <h2 className="text-2xl text-ink">Special Offers</h2>
-          <div className="space-y-4">
-            {[
-              { title: 'Venice Gondola Tour', discount: '15% OFF', image: 'https://picsum.photos/seed/venice/400/300' },
-              { title: 'Tuscany Wine Tasting', discount: 'Points Booster', image: 'https://picsum.photos/seed/tuscany/400/300' },
-            ].map((offer, i) => (
-              <div key={i} className="luxury-card group cursor-pointer">
-                <div className="h-40 overflow-hidden">
-                  <img src={offer.image} alt={offer.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                </div>
-                <div className="p-4 flex justify-between items-center bg-card">
-                  <div>
-                    <h4 className="font-bold text-sm text-ink">{offer.title}</h4>
-                    <p className="text-xs text-gold font-bold">{offer.discount}</p>
-                  </div>
-                  <ArrowRight size={16} className="text-ink/20 group-hover:text-ink transition-colors" />
-                </div>
+          <div className="bg-ink text-paper p-8 rounded-[2.5rem] shadow-xl space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gold/10 rounded-full -mr-16 -mt-16 blur-3xl" />
+            <div className="relative z-10 space-y-4">
+              <div className="flex justify-between items-start">
+                <h3 className="text-xl font-display italic">Your Rewards</h3>
+                <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
+                  user.status === 'Rich' ? 'bg-purple-500/20 border-purple-500 text-purple-400' :
+                  user.status === 'Pro' ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' :
+                  user.status === 'Advanced' ? 'bg-gold/20 border-gold text-gold' :
+                  'bg-paper/10 border-paper/20 text-paper/40'
+                }`}>
+                  {user.status}
+                </span>
               </div>
-            ))}
+              <div className="flex items-end gap-2">
+                <span className="text-5xl font-display text-gold">{user.bonus}</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-paper/40 mb-2">Points</span>
+              </div>
+              <div className="h-2 bg-paper/10 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min((user.bonus / 500) * 100, 100)}%` }}
+                  className="h-full bg-gold"
+                />
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-paper/40">
+                {user.status === 'Rich' ? 'Maximum Status Reached' : 
+                 user.status === 'Pro' ? `${Math.max(0, 10000 - user.total_spent).toFixed(0)}€ more for Rich status` :
+                 user.status === 'Advanced' ? `${Math.max(0, 2000 - user.total_spent).toFixed(0)}€ more for Pro status` :
+                 `${Math.max(0, 500 - user.total_spent).toFixed(0)}€ more for Advanced status`}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-card p-8 rounded-[2.5rem] border border-border shadow-sm space-y-6">
+            <h4 className="font-bold text-xs uppercase tracking-widest text-ink/40">Quick Stats</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Bookings</span>
+                <p className="text-xl font-display text-ink">{bookings.length}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Favorites</span>
+                <p className="text-xl font-display text-ink">{favorites.length}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1377,14 +1251,27 @@ function DashboardView({ user, t, favorites, onRemoveFavorite }: { user: any, t:
   );
 }
 
-function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess }: { setView: any, basket: any[], basketTotal: number, onPaymentSuccess: () => void }) {
+function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: { setView: any, basket: any[], basketTotal: number, onPaymentSuccess: () => void, user: any }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [usePoints, setUsePoints] = useState(false);
+
+  const minigameDiscount = user?.last_game_win ? basketTotal * 0.1 : 0;
+  const pointsToUse = usePoints ? Math.min(user?.bonus || 0, Math.floor((basketTotal - minigameDiscount) * 10)) : 0;
+  const discount = pointsToUse / 10;
+  const finalTotal = basketTotal - minigameDiscount - discount;
 
   const handlePayment = async () => {
     setIsProcessing(true);
-    // Simulate API call for each item
-    for (const item of basket) {
+    
+    // Distribute points across items (simplified: use all on first item or split)
+    let remainingPoints = pointsToUse;
+
+    for (let i = 0; i < basket.length; i++) {
+      const item = basket[i];
+      const itemPoints = i === basket.length - 1 ? remainingPoints : Math.min(remainingPoints, Math.floor(item.price * 10));
+      remainingPoints -= itemPoints;
+
       await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1392,7 +1279,9 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess }: { setV
           type: item.type || 'experience',
           itemName: item.name,
           details: `${item.location} - ${item.duration || 'Booking'}`,
-          amount: item.price
+          amount: item.price,
+          pointsUsed: itemPoints,
+          minigameDiscount: !!user?.last_game_win
         })
       });
     }
@@ -1429,8 +1318,8 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess }: { setV
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
         <div className="space-y-12">
           <div className="space-y-4">
-            <h1 className="text-4xl font-display italic text-ink">Complete Your Booking</h1>
-            <p className="text-ink/60">Secure payment via Stripe or PayPal.</p>
+            <h1 className="text-2xl sm:text-4xl font-display italic text-ink">Complete Your Booking</h1>
+            <p className="text-sm sm:text-base text-ink/60">Secure payment via Stripe or PayPal.</p>
           </div>
 
           <div className="space-y-8">
@@ -1464,6 +1353,37 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess }: { setV
               </div>
             </div>
 
+            <div className="space-y-4">
+              <h3 className="font-bold text-xs uppercase tracking-widest text-ink/40">Order Summary</h3>
+              <div className="bg-paper/30 rounded-2xl p-6 space-y-4">
+                <div className="flex justify-between text-sm">
+                  <span className="text-ink/60">Subtotal</span>
+                  <span className="text-ink font-bold">€{basketTotal.toFixed(2)}</span>
+                </div>
+                {user && user.bonus > 0 && (
+                  <div className="flex justify-between items-center py-2 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="checkbox" 
+                        id="use-points" 
+                        checked={usePoints} 
+                        onChange={() => setUsePoints(!usePoints)}
+                        className="w-4 h-4 accent-gold"
+                      />
+                      <label htmlFor="use-points" className="text-xs font-bold uppercase tracking-widest text-ink/60 cursor-pointer">
+                        Use {pointsToUse} Points for Discount
+                      </label>
+                    </div>
+                    <span className="text-gold font-bold">-€{discount.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-lg pt-4 border-t border-border">
+                  <span className="font-display italic text-ink">Total</span>
+                  <span className="font-display text-ink">€{finalTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
             <button 
               onClick={handlePayment}
               disabled={isProcessing || basket.length === 0}
@@ -1476,7 +1396,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess }: { setV
                   className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
                 />
               ) : (
-                <>Pay €{basketTotal.toFixed(2)}</>
+                <>Pay €{finalTotal.toFixed(2)}</>
               )}
             </button>
             <p className="text-center text-[10px] text-ink/40 uppercase tracking-widest">
@@ -1513,6 +1433,15 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess }: { setV
               </div>
               
               <div className="space-y-2 pt-4 border-t border-border">
+                {user?.last_game_win && (
+                  <div className="flex justify-between items-center p-3 bg-gold/10 rounded-xl border border-gold/20 mb-4">
+                    <div className="flex items-center gap-2 text-gold">
+                      <Sparkles size={14} />
+                      <span className="text-[10px] font-bold uppercase tracking-widest">Minigame Discount Applied</span>
+                    </div>
+                    <span className="text-xs font-bold text-gold">-10%</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-ink/60">Subtotal</span>
                   <span className="text-ink">€{basketTotal.toFixed(2)}</span>
@@ -1548,7 +1477,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess }: { setV
   );
 }
 
-function ReviewsSection({ itemId, t, lang }: { itemId: string, t: any, lang: string }) {
+function ReviewsSection({ itemId, t, lang, user }: { itemId: string, t: any, lang: string, user: any }) {
   const [reviews, setReviews] = useState<any[]>([]);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
@@ -1569,7 +1498,7 @@ function ReviewsSection({ itemId, t, lang }: { itemId: string, t: any, lang: str
       const res = await fetch('/api/reviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId, rating, comment })
+        body: JSON.stringify({ itemId, rating, comment, userId: user?.id })
       });
       const newReview = await res.json();
       setReviews(prev => [newReview, ...prev]);
@@ -1648,94 +1577,111 @@ function ReviewsSection({ itemId, t, lang }: { itemId: string, t: any, lang: str
   );
 }
 
-function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onToggleFavorite }: { items: any[], type: string, title: string, t: any, lang: string, onAddToBasket: (item: any) => void, favorites: any[], onToggleFavorite: (item: any) => void }) {
-  const [filter, setFilter] = useState('all');
-  const [priceFilter, setPriceFilter] = useState('all');
+function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onToggleFavorite, user, initialFilter = 'all', initialPriceFilter = 'all', initialSearch = '' }: { items: any[], type: string, title: string, t: any, lang: string, onAddToBasket: (item: any) => void, favorites: any[], onToggleFavorite: (item: any) => void, user: any, initialFilter?: string, initialPriceFilter?: string, initialSearch?: string }) {
+  const [filter, setFilter] = useState(initialFilter);
+  const [priceFilter, setPriceFilter] = useState(initialPriceFilter);
   const [starFilter, setStarFilter] = useState<number | 'all'>('all');
+  const [search, setSearch] = useState(initialSearch);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  useEffect(() => {
+    setFilter(initialFilter);
+  }, [initialFilter]);
+
+  useEffect(() => {
+    setPriceFilter(initialPriceFilter);
+  }, [initialPriceFilter]);
+
+  useEffect(() => {
+    setSearch(initialSearch);
+  }, [initialSearch]);
 
   const locations = ['all', ...Array.from(new Set(items.map(item => item.location)))];
   const priceLevels = ['all', 'low', 'medium', 'high'];
   const starLevels = ['all', 3, 4, 5];
 
   const filteredItems = items.filter(item => {
-    const locMatch = filter === 'all' || item.location === filter;
-    const priceMatch = priceFilter === 'all' || item.priceLevel === priceFilter;
-    const starMatch = starFilter === 'all' || item.stars === starFilter;
-    return locMatch && priceMatch && starMatch;
+    const locMatch = filter === 'all' || (item.location || '') === filter;
+    const priceMatch = priceFilter === 'all' || (item.price_level || '') === priceFilter;
+    const starMatch = starFilter === 'all' || (item.stars || 0) === starFilter;
+    const searchMatch = !search || 
+      (item.name || '').toLowerCase().includes(search.toLowerCase()) || 
+      (item.description || '').toLowerCase().includes(search.toLowerCase()) ||
+      (item.category || '').toLowerCase().includes(search.toLowerCase());
+    return locMatch && priceMatch && starMatch && searchMatch;
   });
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
-        <div className="space-y-2">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-display italic text-ink">{title}</h1>
-          <p className="text-sm text-ink/60 italic">Curated selections for an authentic Italian experience.</p>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-4 w-full lg:w-auto">
-          <div className="flex items-center gap-2 sm:gap-4 bg-card p-2 rounded-2xl sm:rounded-full border border-border shadow-sm w-full sm:w-auto overflow-x-auto">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 px-2 sm:px-4 whitespace-nowrap">{t.filter}</span>
-            <div className="flex gap-1">
-              {locations.map(loc => (
-                <button
-                  key={loc}
-                  onClick={() => setFilter(loc)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    filter === loc 
-                      ? 'bg-ink text-white' 
-                      : 'hover:bg-paper text-ink/60'
-                  }`}
-                >
-                  {loc === 'all' ? t.all : loc}
-                </button>
-              ))}
-            </div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
+          <div className="space-y-2">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-display italic text-ink">{title}</h1>
+            <p className="text-xs sm:text-sm text-ink/60 italic">Curated selections for an authentic Italian experience.</p>
           </div>
+          
+          <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-2 bg-card p-1.5 rounded-2xl sm:rounded-full border border-border shadow-sm w-full sm:w-auto overflow-x-auto no-scrollbar">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-ink/40 px-3 whitespace-nowrap">{t.filter}</span>
+              <div className="flex gap-1">
+                {locations.map(loc => (
+                  <button
+                    key={loc}
+                    onClick={() => setFilter(loc)}
+                    className={`px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap ${
+                      filter === loc 
+                        ? 'bg-ink text-white' 
+                        : 'hover:bg-paper text-ink/60'
+                    }`}
+                  >
+                    {loc === 'all' ? t.all : loc}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div className="flex items-center gap-4 bg-card p-2 rounded-full border border-border shadow-sm">
-            <span className="text-xs font-bold uppercase tracking-widest text-ink/40 px-4">{t.priceRange}</span>
-            <div className="flex gap-1">
-              {priceLevels.map(level => (
-                <button
-                  key={level}
-                  onClick={() => setPriceFilter(level)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
-                    priceFilter === level 
-                      ? 'bg-gold text-white' 
-                      : 'hover:bg-paper text-ink/60'
-                  }`}
-                >
-                  {level === 'all' ? t.all : t[level]}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 bg-card p-1.5 rounded-2xl sm:rounded-full border border-border shadow-sm w-full sm:w-auto overflow-x-auto no-scrollbar">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-ink/40 px-3 whitespace-nowrap">{t.priceRange}</span>
+              <div className="flex gap-1">
+                {priceLevels.map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setPriceFilter(level)}
+                    className={`px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap ${
+                      priceFilter === level 
+                        ? 'bg-gold text-white' 
+                        : 'hover:bg-paper text-ink/60'
+                    }`}
+                  >
+                    {level === 'all' ? t.all : t[level]}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4 bg-card p-2 rounded-full border border-border shadow-sm">
-            <span className="text-xs font-bold uppercase tracking-widest text-ink/40 px-4">{t.rating}</span>
-            <div className="flex gap-1">
-              {starLevels.map(level => (
-                <button
-                  key={level}
-                  onClick={() => setStarFilter(level as any)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
-                    starFilter === level 
-                      ? 'bg-gold text-white' 
-                      : 'hover:bg-paper text-ink/60'
-                  }`}
-                >
-                  {level === 'all' ? t.all : (
-                    <>
-                      {level} <Star size={10} fill="currentColor" />
-                    </>
-                  )}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 bg-card p-1.5 rounded-2xl sm:rounded-full border border-border shadow-sm w-full sm:w-auto overflow-x-auto no-scrollbar">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-ink/40 px-3 whitespace-nowrap">{t.rating}</span>
+              <div className="flex gap-1">
+                {starLevels.map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setStarFilter(level as any)}
+                    className={`px-3 py-1 rounded-full text-[10px] sm:text-xs font-medium transition-all flex items-center gap-1 whitespace-nowrap ${
+                      starFilter === level 
+                        ? 'bg-gold text-white' 
+                        : 'hover:bg-paper text-ink/60'
+                    }`}
+                  >
+                    {level === 'all' ? t.all : (
+                      <>
+                        {level} <Star size={10} fill="currentColor" />
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
         {filteredItems.map((item, i) => (
@@ -1786,6 +1732,10 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
             </div>
           </motion.div>
         ))}
+      </div>
+
+      <div className="mt-20">
+        <Suggestions t={t} />
       </div>
 
       <AnimatePresence>
@@ -1860,7 +1810,7 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
                   </div>
 
                   {(type === 'hotel' || type === 'restaurant') && (
-                    <ReviewsSection itemId={selectedItem.id} t={t} lang={lang} />
+                    <ReviewsSection itemId={selectedItem.id} t={t} lang={lang} user={user} />
                   )}
 
                   <div className="pt-6">
@@ -1882,13 +1832,62 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
   );
 }
 
-function TaxiView({ t, lang }: { t: any, lang: string }) {
+function Suggestions({ t }: { t: any }) {
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/suggestions')
+      .then(res => res.json())
+      .then(data => setSuggestions(data));
+  }, []);
+
+  if (suggestions.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-xl font-display italic text-ink flex items-center gap-2">
+        <Sparkles size={20} className="text-gold" />
+        {t.suggestions || 'Recommended for You'}
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {suggestions.map(item => (
+          <motion.div 
+            key={item.id}
+            whileHover={{ y: -5 }}
+            className="bg-card rounded-2xl overflow-hidden border border-border shadow-sm group cursor-pointer"
+          >
+            <div className="h-32 relative overflow-hidden">
+              <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+              <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-gold">
+                {(item.type || 'item').toUpperCase()}
+              </div>
+            </div>
+            <div className="p-3 space-y-1">
+              <h4 className="font-bold text-xs text-ink line-clamp-1">{item.name}</h4>
+              <div className="flex justify-between items-center">
+                <span className="text-gold font-display text-sm">€{item.price}</span>
+                <div className="flex items-center gap-1 text-[10px] text-ink/40">
+                  <Star size={8} fill="currentColor" className="text-gold" />
+                  {item.rating}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TaxiView({ t, lang, user, refreshUser }: { t: any, lang: string, user: any, refreshUser: () => void }) {
   const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [pickup, setPickup] = useState('Piazza del Popolo, Roma');
   const [destination, setDestination] = useState('');
   const [selectedCar, setSelectedCar] = useState<number>(0);
   const [starFilter, setStarFilter] = useState<number | 'all'>('all');
   const [isRequesting, setIsRequesting] = useState(false);
+  const [usePoints, setUsePoints] = useState(false);
+  const [rideOptions, setRideOptions] = useState<string[]>([]);
   const [rideStatus, setRideStatus] = useState<'idle' | 'searching' | 'enroute' | 'arrived'>('idle');
   const [estimate, setEstimate] = useState<{ cost: number, time: number, traffic: string, distance: string } | null>(null);
 
@@ -1903,12 +1902,72 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
   }, []);
 
   const VEHICLES = [
-    { id: 0, company: 'Roma Elite Transports', name: 'Mercedes S-Class', type: 'Luxury Sedan', basePrice: 45, multiplier: 1.5, stars: 5, image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=200' },
-    { id: 1, company: 'Prestige Italia', name: 'Range Rover Vogue', type: 'Luxury SUV', basePrice: 60, multiplier: 1.8, stars: 5, image: 'https://images.unsplash.com/photo-1541443131876-44b03de101c5?auto=format&fit=crop&q=80&w=200' },
-    { id: 2, company: 'Veloce Luxury', name: 'Maserati Quattroporte', type: 'Sport Luxury', basePrice: 80, multiplier: 2.2, stars: 4, image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=200' },
-    { id: 3, company: 'City Cab Roma', name: 'Toyota Prius', type: 'Economy Hybrid', basePrice: 15, multiplier: 0.8, stars: 3, image: 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&q=80&w=200' },
-    { id: 4, company: 'EcoTravel Italy', name: 'Nissan Leaf', type: 'Electric Compact', basePrice: 20, multiplier: 0.9, stars: 3, image: 'https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?auto=format&fit=crop&q=80&w=200' },
-    { id: 5, company: 'Standard Transports', name: 'Volkswagen Passat', type: 'Standard Sedan', basePrice: 25, multiplier: 1.0, stars: 3, image: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=200' },
+    { 
+      id: 0, 
+      company: 'Roma Elite Transports', 
+      name: 'Mercedes S-Class', 
+      type: 'Luxury Sedan', 
+      basePrice: 45, 
+      multiplier: 1.5, 
+      stars: 5, 
+      image: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&q=80&w=200',
+      driver: { name: 'Alessandro', rating: 4.9, photo: 'https://i.pravatar.cc/150?u=alessandro', trips: 1240, carPlate: 'RM 452 EL' }
+    },
+    { 
+      id: 1, 
+      company: 'Prestige Italia', 
+      name: 'Range Rover Vogue', 
+      type: 'Luxury SUV', 
+      basePrice: 60, 
+      multiplier: 1.8, 
+      stars: 5, 
+      image: 'https://images.unsplash.com/photo-1541443131876-44b03de101c5?auto=format&fit=crop&q=80&w=200',
+      driver: { name: 'Marco', rating: 4.8, photo: 'https://i.pravatar.cc/150?u=marco', trips: 850, carPlate: 'PR 782 IT' }
+    },
+    { 
+      id: 2, 
+      company: 'Veloce Luxury', 
+      name: 'Maserati Quattroporte', 
+      type: 'Sport Luxury', 
+      basePrice: 80, 
+      multiplier: 2.2, 
+      stars: 4, 
+      image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&q=80&w=200',
+      driver: { name: 'Giulia', rating: 4.9, photo: 'https://i.pravatar.cc/150?u=giulia', trips: 520, carPlate: 'VL 991 SP' }
+    },
+    { 
+      id: 3, 
+      company: 'City Cab Roma', 
+      name: 'Toyota Prius', 
+      type: 'Economy Hybrid', 
+      basePrice: 15, 
+      multiplier: 0.8, 
+      stars: 3, 
+      image: 'https://images.unsplash.com/photo-1590362891991-f776e747a588?auto=format&fit=crop&q=80&w=200',
+      driver: { name: 'Luca', rating: 4.6, photo: 'https://i.pravatar.cc/150?u=luca', trips: 3400, carPlate: 'CC 112 RM' }
+    },
+    { 
+      id: 4, 
+      company: 'EcoTravel Italy', 
+      name: 'Tesla Model S', 
+      type: 'Premium Electric', 
+      basePrice: 50, 
+      multiplier: 1.6, 
+      stars: 5, 
+      image: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&q=80&w=200',
+      driver: { name: 'Sofia', rating: 5.0, photo: 'https://i.pravatar.cc/150?u=sofia', trips: 210, carPlate: 'ET 001 TS' }
+    },
+    { 
+      id: 5, 
+      company: 'Standard Transports', 
+      name: 'Volkswagen Passat', 
+      type: 'Standard Sedan', 
+      basePrice: 25, 
+      multiplier: 1.0, 
+      stars: 3, 
+      image: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&q=80&w=200',
+      driver: { name: 'Pietro', rating: 4.7, photo: 'https://i.pravatar.cc/150?u=pietro', trips: 1560, carPlate: 'ST 552 TR' }
+    },
   ];
 
   const filteredVehicles = VEHICLES.filter(v => starFilter === 'all' || v.stars === starFilter);
@@ -1933,57 +1992,100 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
     }
   };
 
-  const handleRequest = () => {
-    if (!destination) return;
+  const handleRequest = async () => {
+    if (!destination || !estimate) return;
     setIsRequesting(true);
-    setRideStatus('searching');
-    setTimeout(() => setRideStatus('enroute'), 2500);
-    setTimeout(() => setRideStatus('arrived'), 8000);
+    
+    const minigameDiscount = user?.last_game_win ? estimate.cost * 0.1 : 0;
+    const pointsToUse = usePoints ? Math.min(user?.bonus || 0, Math.floor((estimate.cost - minigameDiscount) * 10)) : 0;
+    
+    try {
+      await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'taxi',
+          itemName: `Ride to ${destination}`,
+          details: `From ${pickup} to ${destination}. Options: ${rideOptions.join(', ')}`,
+          amount: estimate.cost,
+          pointsUsed: pointsToUse,
+          minigameDiscount: !!user?.last_game_win
+        })
+      });
+      
+      setRideStatus('searching');
+      setTimeout(() => setRideStatus('enroute'), 2500);
+      setTimeout(() => {
+        setRideStatus('arrived');
+        // Refresh user data to show new points
+        refreshUser();
+      }, 8000);
+    } catch (err) {
+      console.error("Booking error:", err);
+      setIsRequesting(false);
+    }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="space-y-2">
-          <h1 className="text-5xl font-display italic text-ink">
-            <TranslatedText text="Private Transport" lang={lang} />
+          <h1 className="text-3xl sm:text-5xl font-display italic text-ink">
+            {t.privateTransport}
           </h1>
           <p className="text-ink/60 italic">
-            <TranslatedText text="Luxury travel at your fingertips." lang={lang} />
+            {t.luxuryFingertips}
           </p>
         </div>
-        <div className="flex gap-4 w-full md:w-auto">
-          <div className="flex items-center gap-2 bg-card p-2 rounded-full border border-border shadow-sm">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 px-4 whitespace-nowrap">{t.rating}</span>
-            <div className="flex gap-1">
-              {['all', 3, 4, 5].map(level => (
-                <button
-                  key={level}
-                  onClick={() => setStarFilter(level as any)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
-                    starFilter === level 
-                      ? 'bg-gold text-white' 
-                      : 'hover:bg-paper text-ink/60'
+          <div className="flex flex-col gap-4 w-full md:w-auto">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 bg-card p-2 rounded-full border border-border shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 px-4 whitespace-nowrap">{t.rating}</span>
+                <div className="flex gap-1">
+                  {['all', 3, 4, 5].map(level => (
+                    <button
+                      key={level}
+                      onClick={() => setStarFilter(level as any)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
+                        starFilter === level 
+                          ? 'bg-gold text-white' 
+                          : 'hover:bg-paper text-ink/60'
+                      }`}
+                    >
+                      {level === 'all' ? t.all : (
+                        <>
+                          {level} <Star size={10} fill="currentColor" />
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {user && user.bonus > 0 && (
+                <button 
+                  onClick={() => setUsePoints(!usePoints)}
+                  className={`px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2 border ${
+                    usePoints ? 'bg-gold text-white border-gold' : 'bg-card text-ink/60 border-border hover:border-gold'
                   }`}
                 >
-                  {level === 'all' ? t.all : (
-                    <>
-                      {level} <Star size={10} fill="currentColor" />
-                    </>
-                  )}
+                  <Sparkles size={14} />
+                  Use Points (-€{(Math.min(user.bonus, Math.floor((estimate?.cost || 0) * 10)) / 10).toFixed(2)})
                 </button>
-              ))}
+              )}
+            </div>
+
+            <div className="flex gap-4">
+              <button 
+                onClick={handleRequest}
+                disabled={!destination || isRequesting}
+                className={`flex-1 md:flex-none btn-luxury px-10 ${(!destination || isRequesting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {isRequesting ? t.requesting : t.requestNow}
+              </button>
+              <button className="flex-1 md:flex-none btn-outline px-10">{t.schedule}</button>
             </div>
           </div>
-          <button 
-            onClick={handleRequest}
-            disabled={!destination || isRequesting}
-            className={`flex-1 md:flex-none btn-luxury px-10 ${(!destination || isRequesting) ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            {isRequesting ? 'Requesting...' : 'Request Now'}
-          </button>
-          <button className="flex-1 md:flex-none btn-outline px-10">Schedule</button>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1991,7 +2093,7 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
           <div className="bg-card p-6 rounded-[2rem] border border-border shadow-sm space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Pickup Location</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.pickup}</label>
                 <div className="relative">
                   <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-gold" size={18} />
                   <input 
@@ -2003,12 +2105,12 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
                 </div>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Destination</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.destination}</label>
                 <div className="relative">
                   <Compass className="absolute left-4 top-1/2 -translate-y-1/2 text-gold" size={18} />
                   <input 
                     type="text" 
-                    placeholder="Where to?"
+                    placeholder={t.whereTo}
                     value={destination}
                     onChange={(e) => handleDestinationChange(e.target.value)}
                     className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink transition-all"
@@ -2018,30 +2120,59 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
             </div>
 
             {estimate && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex flex-wrap gap-6 pt-4 border-t border-border"
-              >
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Est. Cost</span>
-                  <span className="text-xl font-display text-gold">€{estimate.cost.toFixed(2)}</span>
+              <div className="space-y-4 pt-4 border-t border-border">
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-wrap gap-6"
+                >
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">{t.estCost}</span>
+                    <div className="flex flex-col">
+                      <span className={`text-xl font-display ${user?.last_game_win ? 'text-ink/40 line-through text-sm' : 'text-gold'}`}>€{estimate.cost.toFixed(2)}</span>
+                      {user?.last_game_win && (
+                        <span className="text-xl font-display text-gold">€{(estimate.cost * 0.9).toFixed(2)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">{t.estTime}</span>
+                    <span className="text-xl font-display text-ink">{estimate.time} mins</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">{t.distance}</span>
+                    <span className="text-xl font-display text-ink">{estimate.distance}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">{t.traffic}</span>
+                    <span className={`text-xl font-display ${estimate.traffic === 'Heavy' ? 'text-red-500' : estimate.traffic === 'Moderate' ? 'text-orange-500' : 'text-emerald-500'}`}>
+                      {estimate.traffic}
+                    </span>
+                  </div>
+                </motion.div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Ride Options</span>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'quiet', label: 'Quiet Ride', icon: <VolumeX size={12} /> },
+                      { id: 'luggage', label: 'Extra Luggage', icon: <Briefcase size={12} /> },
+                      { id: 'child', label: 'Child Seat', icon: <Baby size={12} /> },
+                      { id: 'pet', label: 'Pet Friendly', icon: <Dog size={12} /> }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setRideOptions(prev => prev.includes(opt.id) ? prev.filter(i => i !== opt.id) : [...prev, opt.id])}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${
+                          rideOptions.includes(opt.id) ? 'bg-gold text-white' : 'bg-paper text-ink/40 hover:bg-paper/80'
+                        }`}
+                      >
+                        {opt.icon} {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Est. Time</span>
-                  <span className="text-xl font-display text-ink">{estimate.time} mins</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Distance</span>
-                  <span className="text-xl font-display text-ink">{estimate.distance}</span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Traffic</span>
-                  <span className={`text-xl font-display ${estimate.traffic === 'Heavy' ? 'text-red-500' : estimate.traffic === 'Moderate' ? 'text-orange-500' : 'text-emerald-500'}`}>
-                    {estimate.traffic}
-                  </span>
-                </div>
-              </motion.div>
+              </div>
             )}
           </div>
 
@@ -2053,7 +2184,7 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
               loading="lazy" 
               allowFullScreen 
               referrerPolicy="no-referrer-when-downgrade"
-              src={`https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d15000!2d${coords?.lng || 12.4964}!3d${coords?.lat || 41.9028}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sit!4v1620000000000!5m2!1sen!2sit`}
+              src={`https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d15000!2d${coords?.lng || 12.4964}!3d${coords?.lat || 41.9028}!2m3!1f0!2f0!3f0!3m2!i1024!2i768!4f13.1!5e0!3m2!1sen!2sit!4v1620000000000!5m2!1sen!2sit`}
             ></iframe>
             
             <AnimatePresence>
@@ -2062,43 +2193,96 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-8"
+                  className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 z-20"
                 >
                   <motion.div 
                     initial={{ scale: 0.9, y: 20 }}
                     animate={{ scale: 1, y: 0 }}
-                    className="bg-card p-8 rounded-[2rem] shadow-2xl max-w-sm w-full text-center space-y-6"
+                    className="bg-card p-6 sm:p-8 rounded-[2.5rem] shadow-2xl max-w-md w-full space-y-6"
                   >
-                    <div className="relative w-20 h-20 mx-auto">
-                      <div className="absolute inset-0 bg-gold/20 rounded-full animate-ping" />
-                      <div className="relative w-20 h-20 bg-gold rounded-full flex items-center justify-center text-white">
-                        {rideStatus === 'searching' ? <Globe className="animate-spin" size={32} /> : <Car size={32} />}
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <h4 className="text-2xl font-display italic text-ink">
+                          {rideStatus === 'searching' && t.findingDriver}
+                          {rideStatus === 'enroute' && t.driverEnroute}
+                          {rideStatus === 'arrived' && t.driverArrived}
+                        </h4>
+                        <p className="text-xs text-ink/60">
+                          {rideStatus === 'searching' && t.connectingPartners}
+                          {rideStatus === 'enroute' && `${VEHICLES[selectedCar].name} is 2 minutes away.`}
+                          {rideStatus === 'arrived' && t.rideWaiting}
+                        </p>
+                      </div>
+                      <div className="relative w-16 h-16">
+                        <div className="absolute inset-0 bg-gold/20 rounded-full animate-ping" />
+                        <div className="relative w-16 h-16 bg-gold rounded-full flex items-center justify-center text-white">
+                          {rideStatus === 'searching' ? <Globe className="animate-spin" size={24} /> : <Car size={24} />}
+                        </div>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <h4 className="text-2xl font-display italic text-ink">
-                        {rideStatus === 'searching' && 'Finding your driver...'}
-                        {rideStatus === 'enroute' && 'Driver is on the way'}
-                        {rideStatus === 'arrived' && 'Driver has arrived!'}
-                      </h4>
-                      <p className="text-sm text-ink/60">
-                        {rideStatus === 'searching' && 'Connecting with premium partners in Roma.'}
-                        {rideStatus === 'enroute' && `${VEHICLES[selectedCar].name} is 2 minutes away.`}
-                        {rideStatus === 'arrived' && 'Your luxury ride is waiting outside.'}
-                      </p>
-                    </div>
-                    {rideStatus === 'arrived' && (
-                      <button 
-                        onClick={() => {
-                          setIsRequesting(false);
-                          setRideStatus('idle');
-                          setDestination('');
-                        }}
-                        className="w-full btn-luxury"
-                      >
-                        Finish Ride
-                      </button>
+
+                    {rideStatus !== 'searching' && (
+                      <div className="bg-paper/50 p-4 rounded-2xl flex items-center gap-4">
+                        <img src={VEHICLES[selectedCar].driver.photo} alt="Driver" className="w-12 h-12 rounded-full object-cover border-2 border-gold" />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center">
+                            <span className="font-bold text-ink">{VEHICLES[selectedCar].driver.name}</span>
+                            <div className="flex items-center gap-1 text-gold text-xs">
+                              <Star size={10} fill="currentColor" />
+                              <span>{VEHICLES[selectedCar].driver.rating}</span>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-ink/40 uppercase tracking-widest font-bold">
+                            <span>{VEHICLES[selectedCar].name}</span>
+                            <span>{VEHICLES[selectedCar].driver.carPlate}</span>
+                          </div>
+                        </div>
+                      </div>
                     )}
+
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-ink/40">
+                        <span>Progress</span>
+                        <span>{rideStatus === 'searching' ? '0%' : rideStatus === 'enroute' ? '65%' : '100%'}</span>
+                      </div>
+                      <div className="h-1.5 bg-paper rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: rideStatus === 'searching' ? '5%' : rideStatus === 'enroute' ? '65%' : '100%' }}
+                          className="h-full bg-gold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      {rideStatus === 'arrived' ? (
+                        <button 
+                          onClick={() => {
+                            setIsRequesting(false);
+                            setRideStatus('idle');
+                            setDestination('');
+                          }}
+                          className="w-full btn-luxury py-4"
+                        >
+                          Finish Ride
+                        </button>
+                      ) : (
+                        <>
+                          <button className="flex-1 btn-outline py-3 text-xs flex items-center justify-center gap-2">
+                            <MessageSquare size={14} /> Message
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setIsRequesting(false);
+                              setRideStatus('idle');
+                            }}
+                            className="flex-1 bg-red-50 text-red-500 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest hover:bg-red-100 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </motion.div>
                 </motion.div>
               )}
@@ -2135,20 +2319,20 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
                     <div>
                       <h4 className="font-bold text-sm text-ink">{v.name}</h4>
                       <p className="text-[10px] font-bold uppercase tracking-widest text-gold">
-                        <TranslatedText text={v.company} lang={lang} />
+                        {v.company}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-bold text-ink">Base €{v.basePrice}</p>
                     <p className="text-[10px] text-ink/40">
-                      <TranslatedText text="Luxury Tier" lang={lang} />
+                      {t.luxuryTier}
                     </p>
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-2 border-t border-border">
                   <span className="text-[10px] text-ink/60">
-                    <TranslatedText text={v.type} lang={lang} />
+                    {v.type}
                   </span>
                   <div className="flex items-center gap-1 text-gold">
                     {Array.from({ length: v.stars }).map((_, j) => (
@@ -2175,6 +2359,10 @@ function TaxiView({ t, lang }: { t: any, lang: string }) {
             </ul>
           </div>
         </div>
+      </div>
+
+      <div className="mt-20">
+        <Suggestions t={t} />
       </div>
     </div>
   );
@@ -2229,10 +2417,10 @@ function AuthModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: (us
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative w-full max-w-md bg-card rounded-[2rem] overflow-hidden shadow-2xl p-8 space-y-8"
+        className="relative w-full max-w-md bg-card rounded-[2rem] overflow-hidden shadow-2xl p-6 sm:p-8 space-y-6 sm:space-y-8 mx-4"
       >
         <div className="text-center space-y-2">
-          <h2 className="text-4xl font-display italic text-ink">
+          <h2 className="text-3xl sm:text-4xl font-display italic text-ink">
             {mode === 'login' ? 'Welcome Back' : 'Join ItaliaGo'}
           </h2>
           <p className="text-ink/60 text-sm">
