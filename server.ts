@@ -4,6 +4,13 @@ import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer, WebSocket } from "ws";
+import session from "express-session";
+
+declare module "express-session" {
+  interface SessionData {
+    userId: number;
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,7 +31,8 @@ db.exec(`
     status TEXT DEFAULT 'Normal',
     total_spent REAL DEFAULT 0,
     last_game_win DATETIME,
-    role TEXT DEFAULT 'user'
+    role TEXT DEFAULT 'user',
+    avatar_url TEXT
   );
 
   CREATE TABLE IF NOT EXISTS listings (
@@ -99,6 +107,9 @@ try {
   if (!columnNames.includes('role')) {
     db.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run();
   }
+  if (!columnNames.includes('avatar_url')) {
+    db.prepare("ALTER TABLE users ADD COLUMN avatar_url TEXT").run();
+  }
 } catch (error) {
   console.error("Migration Error:", error);
 }
@@ -108,67 +119,27 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json());
+  app.use(session({
+    secret: "italiago-secret-key-2026",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  // Helper to get current user
+  const getCurrentUser = (req: express.Request) => {
+    if (!req.session.userId) return null;
+    return db.prepare("SELECT * FROM users WHERE id = ?").get(req.session.userId);
+  };
 
-  const wss = new WebSocketServer({ server });
-  const games = new Map<string, { players: WebSocket[], board: (string|null)[], turn: number }>();
-
-  wss.on('connection', (ws) => {
-    let roomId: string | null = null;
-    ws.on('message', (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-        if (message.type === 'join') {
-          roomId = message.roomId;
-          if (!games.has(roomId!)) {
-            games.set(roomId!, { players: [ws], board: Array(9).fill(null), turn: 0 });
-            ws.send(JSON.stringify({ type: 'waiting' }));
-          } else {
-            const game = games.get(roomId!)!;
-            if (game.players.length < 2) {
-              game.players.push(ws);
-              game.players[0].send(JSON.stringify({ type: 'start', symbol: 'X', turn: true }));
-              game.players[1].send(JSON.stringify({ type: 'start', symbol: 'O', turn: false }));
-            }
-          }
-        }
-        if (message.type === 'move') {
-          const game = games.get(roomId!)!;
-          if (!game) return;
-          const playerIndex = game.players.indexOf(ws);
-          if (playerIndex === game.turn && game.board[message.index] === null) {
-            game.board[message.index] = playerIndex === 0 ? 'X' : 'O';
-            game.turn = 1 - game.turn;
-            game.players.forEach((p, idx) => {
-              p.send(JSON.stringify({ type: 'update', board: game.board, turn: idx === game.turn }));
-            });
-            const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (const pattern of winPatterns) {
-              const [a, b, c] = pattern;
-              if (game.board[a] && game.board[a] === game.board[b] && game.board[a] === game.board[c]) {
-                game.players.forEach((p, idx) => p.send(JSON.stringify({ type: 'gameOver', winner: idx === playerIndex ? 'you' : 'opponent' })));
-                games.delete(roomId!);
-                return;
-              }
-            }
-            if (!game.board.includes(null)) {
-              game.players.forEach(p => p.send(JSON.stringify({ type: 'gameOver', winner: 'draw' })));
-              games.delete(roomId!);
-            }
-          }
-        }
-      } catch (e) { console.error(e); }
-    });
-    ws.on('close', () => {
-      if (roomId && games.has(roomId)) {
-        const game = games.get(roomId)!;
-        game.players.forEach(p => { if (p !== ws) p.send(JSON.stringify({ type: 'opponentLeft' })); });
-        games.delete(roomId);
-      }
-    });
+  // Middleware to attach user to request
+  app.use((req, res, next) => {
+    (req as any).user = getCurrentUser(req);
+    next();
   });
 
   // Seed user if not exists
@@ -178,11 +149,14 @@ async function startServer() {
       "demo@italiago.com",
       "password123",
       "Marco Rossi",
-      0.0, // Default Wallet: €0.00
-      0,   // Default Bonus: 0
+      0.0,
+      0,
       0,
       "admin"
     );
+  } else {
+    // Ensure demo user is admin if they already exist
+    db.prepare("UPDATE users SET role = 'admin' WHERE email = ?").run("demo@italiago.com");
   }
 
   // Seed listings if empty
@@ -222,11 +196,11 @@ async function startServer() {
         email,
         password,
         name,
-        0.0, // Initial balance set to 0
-        0   // Initial bonus set to 0
+        0.0,
+        0
       );
-      const user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
-      res.json(user);
+      req.session.userId = result.lastInsertRowid as number;
+      res.json(db.prepare("SELECT * FROM users WHERE id = ?").get(req.session.userId));
     } catch (error) {
       res.status(400).json({ error: "Email already exists" });
     }
@@ -234,8 +208,9 @@ async function startServer() {
 
   app.post("/api/login", (req, res) => {
     const { email, password } = req.body;
-    const user = db.prepare("SELECT * FROM users WHERE email = ? AND password = ?").get(email, password);
+    const user: any = db.prepare("SELECT * FROM users WHERE email = ? AND password = ?").get(email, password);
     if (user) {
+      req.session.userId = user.id;
       res.json(user);
     } else {
       res.status(401).json({ error: "Invalid credentials" });
@@ -252,8 +227,8 @@ async function startServer() {
   });
 
   app.post("/api/admin/listings", (req, res) => {
-    const user = db.prepare("SELECT role FROM users LIMIT 1").get(); // Simple check for demo
-    if (!user || user.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
+    const currentUser: any = (req as any).user;
+    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
 
     const listing = req.body;
     if (!listing.id) listing.id = Math.random().toString(36).substr(2, 9);
@@ -291,8 +266,8 @@ async function startServer() {
   });
 
   app.delete("/api/admin/listings/:id", (req, res) => {
-    const user = db.prepare("SELECT role FROM users LIMIT 1").get();
-    if (!user || user.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
+    const currentUser: any = (req as any).user;
+    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
 
     db.prepare("DELETE FROM listings WHERE id = ?").run(req.params.id);
     res.json({ success: true });
@@ -310,19 +285,47 @@ async function startServer() {
   });
 
   app.get("/api/user", (req, res) => {
-    // In a real app, we'd use sessions/JWT. For now, just return the first user or null.
-    const user = db.prepare("SELECT * FROM users LIMIT 1").get();
-    res.json(user || null);
+    res.json((req as any).user);
+  });
+
+  app.post("/api/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) return res.status(500).json({ error: "Could not log out" });
+      res.json({ success: true });
+    });
+  });
+
+  app.post("/api/user/profile", (req, res) => {
+    const currentUser: any = (req as any).user;
+    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+    const { name, avatar_url } = req.body;
+    
+    try {
+      db.prepare("UPDATE users SET name = ?, avatar_url = ? WHERE id = ?").run(
+        name || currentUser.name,
+        avatar_url || currentUser.avatar_url,
+        currentUser.id
+      );
+      res.json(db.prepare("SELECT * FROM users WHERE id = ?").get(currentUser.id));
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.get("/api/bookings", (req, res) => {
-    const bookings = db.prepare("SELECT * FROM bookings ORDER BY created_at DESC").all();
+    const currentUser: any = (req as any).user;
+    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+    const bookings = db.prepare("SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC").all(currentUser.id);
     res.json(bookings);
   });
 
   app.post("/api/bookings", (req, res) => {
     const { type, itemName, details, amount, pointsUsed, minigameDiscount } = req.body;
-    const user = db.prepare("SELECT id, bonus, total_spent FROM users LIMIT 1").get();
+    const currentUser: any = (req as any).user;
+    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+    
+    const user = db.prepare("SELECT id, bonus, total_spent FROM users WHERE id = ?").get(currentUser.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
     
     let baseAmount = amount;
     if (minigameDiscount) {
@@ -335,10 +338,12 @@ async function startServer() {
     // Calculate 15% bonus on the final paid amount
     const bonusEarned = Math.floor(finalAmount * 0.15);
     
+    let bookingId: number | bigint = 0;
     db.transaction(() => {
-      db.prepare(
+      const result = db.prepare(
         "INSERT INTO bookings (user_id, type, item_name, details, amount) VALUES (?, ?, ?, ?, ?)"
       ).run(user.id, type, itemName, details, finalAmount);
+      bookingId = result.lastInsertRowid;
 
       const bonusUpdate = bonusEarned - (pointsUsed || 0);
       const newTotalSpent = user.total_spent + finalAmount;
@@ -353,21 +358,19 @@ async function startServer() {
       ).run(bonusUpdate, newTotalSpent, newStatus, user.id);
     })();
 
-    res.json({ id: 0, status: "confirmed", bonusEarned, finalAmount });
+    res.json({ id: bookingId, status: "confirmed", bonusEarned, finalAmount });
   });
 
   app.post("/api/game-win", (req, res) => {
-    const user = db.prepare("SELECT id FROM users LIMIT 1").get();
-    db.prepare("UPDATE users SET last_game_win = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
+    const currentUser: any = (req as any).user;
+    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+    db.prepare("UPDATE users SET last_game_win = CURRENT_TIMESTAMP WHERE id = ?").run(currentUser.id);
     res.json({ status: "ok" });
   });
 
   app.get("/api/offers", (req, res) => {
-    const user = db.prepare("SELECT has_purchased FROM users LIMIT 1").get();
-    
-    if (!user || !user.has_purchased) {
-      return res.json([]);
-    }
+    const currentUser: any = (req as any).user;
+    if (!currentUser) return res.json([]);
 
     // Dynamic offers logic
     const offers = [
@@ -384,15 +387,27 @@ async function startServer() {
 
   app.post("/api/redeem", (req, res) => {
     const { offerId, points } = req.body;
-    const user = db.prepare("SELECT id, bonus FROM users LIMIT 1").get();
+    const currentUser: any = (req as any).user;
+    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+    
+    const pointsToDeduct = Number(points);
+    if (isNaN(pointsToDeduct) || pointsToDeduct <= 0) {
+      return res.status(400).json({ error: "Invalid points amount" });
+    }
 
-    if (user.bonus < points) {
+    const user = db.prepare("SELECT id, bonus FROM users WHERE id = ?").get(currentUser.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (user.bonus < pointsToDeduct) {
       return res.status(400).json({ error: "Insufficient bonus points" });
     }
 
-    db.prepare("UPDATE users SET bonus = bonus - ? WHERE id = ?").run(points, user.id);
-    
-    res.json({ success: true, newBonus: user.bonus - points });
+    try {
+      db.prepare("UPDATE users SET bonus = bonus - ? WHERE id = ?").run(pointsToDeduct, user.id);
+      res.json({ success: true, newBonus: user.bonus - pointsToDeduct });
+    } catch (err) {
+      res.status(500).json({ error: "Failed to update bonus points" });
+    }
   });
 
   // Reviews
@@ -412,16 +427,16 @@ async function startServer() {
   });
 
   app.post("/api/reviews", express.json(), (req, res) => {
-    const { userId, itemId, rating, comment } = req.body;
+    const { itemId, rating, comment } = req.body;
+    const currentUser: any = (req as any).user;
+    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+    
     if (!itemId || !rating || !comment) {
       return res.status(400).json({ error: "Missing required fields" });
     }
     
-    // Use provided userId or default to first user for demo
-    const finalUserId = userId || 1;
-    
     try {
-      const result = db.prepare("INSERT INTO reviews (user_id, item_id, rating, comment) VALUES (?, ?, ?, ?)").run(finalUserId, itemId, rating, comment);
+      const result = db.prepare("INSERT INTO reviews (user_id, item_id, rating, comment) VALUES (?, ?, ?, ?)").run(currentUser.id, itemId, rating, comment);
       const newReview = db.prepare(`
         SELECT r.*, u.name as user_name 
         FROM reviews r 
@@ -476,6 +491,70 @@ async function startServer() {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
     });
   }
+
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  const wss = new WebSocketServer({ server });
+  const games = new Map<string, { players: WebSocket[], board: (string|null)[], turn: number }>();
+
+  wss.on('connection', (ws) => {
+    let roomId: string | null = null;
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        if (message.type === 'join') {
+          roomId = message.roomId;
+          if (!games.has(roomId!)) {
+            games.set(roomId!, { players: [ws], board: Array(9).fill(null), turn: 0 });
+            ws.send(JSON.stringify({ type: 'waiting' }));
+          } else {
+            const game = games.get(roomId!)!;
+            if (game.players.length < 2) {
+              game.players.push(ws);
+              game.players[0].send(JSON.stringify({ type: 'start', symbol: 'X', turn: true }));
+              game.players[1].send(JSON.stringify({ type: 'start', symbol: 'O', turn: false }));
+            } else {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+            }
+          }
+        }
+        if (message.type === 'move') {
+          const game = games.get(roomId!)!;
+          if (!game) return;
+          const playerIndex = game.players.indexOf(ws);
+          if (playerIndex === game.turn && game.board[message.index] === null) {
+            game.board[message.index] = playerIndex === 0 ? 'X' : 'O';
+            game.turn = 1 - game.turn;
+            game.players.forEach((p, idx) => {
+              p.send(JSON.stringify({ type: 'update', board: game.board, turn: idx === game.turn }));
+            });
+            const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (const pattern of winPatterns) {
+              const [a, b, c] = pattern;
+              if (game.board[a] && game.board[a] === game.board[b] && game.board[a] === game.board[c]) {
+                game.players.forEach((p, idx) => p.send(JSON.stringify({ type: 'gameOver', winner: idx === playerIndex ? 'you' : 'opponent' })));
+                games.delete(roomId!);
+                return;
+              }
+            }
+            if (!game.board.includes(null)) {
+              game.players.forEach(p => p.send(JSON.stringify({ type: 'gameOver', winner: 'draw' })));
+              games.delete(roomId!);
+            }
+          }
+        }
+      } catch (e) { console.error(e); }
+    });
+    ws.on('close', () => {
+      if (roomId && games.has(roomId)) {
+        const game = games.get(roomId)!;
+        game.players.forEach(p => { if (p !== ws) p.send(JSON.stringify({ type: 'opponentLeft' })); });
+        games.delete(roomId);
+      }
+    });
+  });
 
   // Graceful shutdown
   process.on('SIGINT', () => {

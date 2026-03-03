@@ -144,7 +144,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                   className="bg-card rounded-3xl border border-border overflow-hidden shadow-sm group"
                 >
                   <div className="relative h-48">
-                    <img src={listing.image} alt={listing.name} className="w-full h-full object-cover" />
+                    <img src={listing.image || undefined} alt={listing.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => setEditingListing(listing)}

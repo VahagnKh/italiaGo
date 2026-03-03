@@ -28,7 +28,10 @@ import {
   Baby,
   Dog,
   MessageSquare,
-  LayoutDashboard
+  LayoutDashboard,
+  Camera,
+  Upload,
+  Shield
 } from 'lucide-react';
 
 import { useLanguage } from './contexts/LanguageContext';
@@ -113,8 +116,18 @@ export default function App() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showAI, setShowAI] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [notifications, setNotifications] = useState<{ id: string, message: string, type: 'success' | 'info' | 'error' }[]>([]);
   const [infoModal, setInfoModal] = useState<{ title: string, content: string } | null>(null);
   const [listings, setListings] = useState<any[]>([]);
+
+  const addNotification = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setNotifications(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
 
   useEffect(() => {
     fetch('/api/listings')
@@ -159,9 +172,7 @@ export default function App() {
   const basketTotal = basket.reduce((sum, item) => sum + item.price, 0);
 
   useEffect(() => {
-    fetch('/api/user')
-      .then(res => res.json())
-      .then(data => setUser(data));
+    refreshUser();
   }, []);
 
   useEffect(() => {
@@ -202,10 +213,9 @@ export default function App() {
           <button onClick={() => { setView('rentals'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'rentals' ? 'text-ink' : ''}`}>{t.rentals}</button>
           <button onClick={() => { setView('events'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'events' ? 'text-ink' : ''}`}>{t.events}</button>
           <button onClick={() => { setView('taxi'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'taxi' ? 'text-ink' : ''}`}>{t.taxi}</button>
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.name === 'Marco Rossi') && (
             <button 
-              onClick={() => setView('home')} 
-              onDoubleClick={() => setShowAdmin(true)}
+              onClick={() => setShowAdmin(true)} 
               className="flex items-center gap-2 px-4 py-2 bg-ink text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gold transition-colors"
             >
               <LayoutDashboard size={14} />
@@ -229,7 +239,7 @@ export default function App() {
               <button onClick={() => { setView('rentals'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.rentals}</button>
               <button onClick={() => { setView('events'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.events}</button>
               <button onClick={() => { setView('taxi'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.taxi}</button>
-              {user?.role === 'admin' && (
+              {(user?.role === 'admin' || user?.name === 'Marco Rossi') && (
                 <button 
                   onClick={() => { setShowAdmin(true); setShowMobileMenu(false); }} 
                   className="flex items-center gap-2 text-left text-sm font-bold uppercase tracking-widest text-gold"
@@ -273,7 +283,7 @@ export default function App() {
                     ) : (
                       basket.map((item) => (
                         <div key={item.basketId} className="flex gap-3 group">
-                          <img src={item.image} className="w-12 h-12 rounded-lg object-cover" />
+                          <img src={item.image || undefined} className="w-12 h-12 rounded-lg object-cover" />
                           <div className="flex-1">
                             <h4 className="text-xs font-bold text-ink">{item.name}</h4>
                             <p className="text-[10px] text-ink/40">{item.location}</p>
@@ -345,22 +355,73 @@ export default function App() {
           <div className="relative">
             {user ? (
             <div className="flex items-center gap-1.5 sm:gap-4">
-              <button 
-                onClick={() => setView('dashboard')}
-                className="flex items-center gap-1.5 p-1 sm:px-4 sm:py-2 rounded-full border border-border hover:bg-paper transition-colors"
-              >
-                <div className="w-7 h-7 sm:w-6 sm:h-6 bg-gold rounded-full flex items-center justify-center text-[9px] sm:text-[10px] text-white font-bold shrink-0">
-                  {user.name.split(' ').map((n: any) => n[0]).join('')}
-                </div>
-                <span className="hidden sm:inline text-sm font-medium text-ink truncate max-w-[80px]">{user.name}</span>
-              </button>
-              <button 
-                onClick={() => setUser(null)}
-                className="p-1.5 text-ink/40 hover:text-red-500 transition-colors"
-                title="Logout"
-              >
-                <LogOut size={14} className="sm:w-[16px] sm:h-[16px]" />
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-1.5 p-1 sm:px-4 sm:py-2 rounded-full border border-border hover:bg-paper transition-colors"
+                >
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.name} className="w-7 h-7 sm:w-6 sm:h-6 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-7 h-7 sm:w-6 sm:h-6 bg-gold rounded-full flex items-center justify-center text-[9px] sm:text-[10px] text-white font-bold shrink-0">
+                      {user.name.split(' ').map((n: any) => n[0]).join('')}
+                    </div>
+                  )}
+                  <span className="hidden sm:inline text-sm font-medium text-ink truncate max-w-[80px]">{user.name}</span>
+                </button>
+
+                <AnimatePresence>
+                  {showProfileMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-56 bg-card rounded-2xl shadow-2xl border border-border z-50 overflow-hidden"
+                      >
+                        <div className="p-4 border-b border-border bg-paper/30">
+                          <p className="text-xs font-bold uppercase tracking-widest text-ink/40 mb-1">Account</p>
+                          <p className="text-sm font-bold text-ink truncate">{user.email}</p>
+                        </div>
+                        <div className="p-2">
+                          <button 
+                            onClick={() => { setView('dashboard'); setShowProfileMenu(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-ink hover:bg-paper transition-colors"
+                          >
+                            <LayoutDashboard size={16} className="text-gold" />
+                            Dashboard
+                          </button>
+                          <button 
+                            onClick={() => { setView('dashboard'); setShowProfileMenu(false); /* We'll trigger the tab change via a global state or just let the user click it in dashboard */ }}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-ink hover:bg-paper transition-colors"
+                          >
+                            <User size={16} className="text-gold" />
+                            My Profile
+                          </button>
+                          {user.role === 'admin' && (
+                            <button 
+                              onClick={() => { setShowAdmin(true); setShowProfileMenu(false); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-ink hover:bg-paper transition-colors"
+                            >
+                              <Shield size={16} className="text-gold" />
+                              Admin Panel
+                            </button>
+                          )}
+                          <div className="h-px bg-border my-2" />
+                          <button 
+                            onClick={() => { setUser(null); setShowProfileMenu(false); }}
+                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors"
+                          >
+                            <LogOut size={16} />
+                            Sign Out
+                          </button>
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           ) : (
             <button onClick={() => setShowAuthModal(true)} className="btn-luxury text-[9px] sm:text-sm px-3 py-2 sm:px-6 sm:py-3 whitespace-nowrap">Sign In</button>
@@ -370,8 +431,8 @@ export default function App() {
       </nav>
 
       <main className="flex-1 pt-20">
-        {view === 'home' && <HomeView setView={setView} t={t} lang={lang} setInfoModal={setInfoModal} setInitialFilter={setInitialFilter} />}
-        {view === 'dashboard' && <DashboardView user={user} t={t} favorites={favorites} onRemoveFavorite={toggleFavorite} refreshUser={refreshUser} />}
+        {view === 'home' && <HomeView setView={setView} t={t} lang={lang} setInfoModal={setInfoModal} setInitialFilter={setInitialFilter} addNotification={addNotification} />}
+        {view === 'dashboard' && <DashboardView user={user} t={t} favorites={favorites} onRemoveFavorite={toggleFavorite} refreshUser={refreshUser} addNotification={addNotification} />}
         {view === 'checkout' && <CheckoutView setView={setView} basket={basket} basketTotal={basketTotal} onPaymentSuccess={() => { setBasket([]); refreshUser(); }} user={user} />}
         {view === 'hotels' && <ListView items={HOTELS} type="hotel" title={t.hotels} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
         {view === 'restaurants' && <ListView items={RESTAURANTS} type="restaurant" title={t.restaurants} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
@@ -427,7 +488,7 @@ export default function App() {
             <div className="flex gap-2">
               <input type="email" placeholder="Email" className="bg-paper/10 border-none rounded-full px-4 py-2 text-sm w-full outline-none focus:ring-1 focus:ring-gold" />
               <button 
-                onClick={() => alert('Thank you for joining our newsletter!')}
+                onClick={() => addNotification('Thank you for joining our newsletter!', 'success')}
                 className="bg-gold text-ink px-4 py-2 rounded-full text-sm font-bold"
               >
                 Join
@@ -452,12 +513,33 @@ export default function App() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="fixed bottom-8 right-8 w-12 h-12 bg-gold text-white rounded-full shadow-2xl flex items-center justify-center z-[100] hover:scale-110 transition-transform"
+            className="fixed bottom-8 left-8 w-12 h-12 bg-gold text-white rounded-full shadow-2xl flex items-center justify-center z-[100] hover:scale-110 transition-transform"
           >
             <ArrowRight size={20} className="-rotate-90" />
           </motion.button>
         )}
       </AnimatePresence>
+
+      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[150] flex flex-col gap-2 pointer-events-none">
+        <AnimatePresence>
+          {notifications.map(n => (
+            <motion.div
+              key={n.id}
+              initial={{ opacity: 0, y: -20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className={`px-6 py-3 rounded-full shadow-2xl backdrop-blur-md text-sm font-bold flex items-center gap-3 pointer-events-auto ${
+                n.type === 'success' ? 'bg-emerald-500/90 text-white' :
+                n.type === 'error' ? 'bg-red-500/90 text-white' :
+                'bg-ink/90 text-paper'
+              }`}
+            >
+              <Sparkles size={16} />
+              {n.message}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       <AIConcierge isOpen={showAI} setIsOpen={setShowAI} />
       <AnimatePresence>
@@ -512,7 +594,7 @@ export default function App() {
   );
 }
 
-function HomeView({ setView, t, lang, setInfoModal, setInitialFilter }: { setView: any, t: any, lang: string, setInfoModal: any, setInitialFilter: (f: string) => void }) {
+function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotification }: { setView: any, t: any, lang: string, setInfoModal: any, setInitialFilter: (f: string) => void, addNotification: (m: string, type?: any) => void }) {
   return (
     <div className="space-y-20 pb-20">
       {/* Hero */}
@@ -622,7 +704,7 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter }: { setVie
               }}
               className="group relative h-[500px] rounded-3xl overflow-hidden shadow-lg cursor-pointer"
             >
-              <img src={dest.image} alt={dest.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              <img src={dest.image || undefined} alt={dest.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
               <div className="absolute bottom-0 p-8 text-white space-y-2">
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-gold">{dest.tagline}</span>
@@ -650,7 +732,7 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter }: { setVie
                 className="space-y-6 group cursor-pointer"
               >
                 <div className="aspect-[4/5] overflow-hidden rounded-3xl">
-                  <img src={story.image} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  <img src={story.image || undefined} alt={story.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                 </div>
                 <div className="space-y-3">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-gold">By {story.author}</p>
@@ -675,7 +757,7 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter }: { setVie
       <section className="max-w-7xl mx-auto px-6 pb-20">
         <div className="bg-ink rounded-[3rem] p-12 md:p-24 text-center text-white space-y-8 relative overflow-hidden">
           <div className="absolute inset-0 opacity-20">
-            <img src="https://picsum.photos/seed/newsletter-bg/1920/1080" className="w-full h-full object-cover" />
+            <img src="https://picsum.photos/seed/newsletter-bg/1920/1080" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           </div>
           <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
             <h2 className="text-4xl md:text-6xl font-display italic">Join the Inner Circle</h2>
@@ -683,7 +765,7 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter }: { setVie
             <div className="flex flex-col md:flex-row gap-4 pt-4">
               <input type="email" placeholder="Your email address" className="flex-1 bg-white/10 border border-white/20 rounded-full px-8 py-4 outline-none focus:ring-2 focus:ring-gold transition-all" />
               <button 
-                onClick={() => alert('Thank you for subscribing!')}
+                onClick={() => addNotification('Welcome to the Inner Circle!', 'success')}
                 className="btn-luxury px-12 py-4"
               >
                 Subscribe
@@ -696,7 +778,7 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter }: { setVie
   );
 }
 
-function TicTacToe({ user, onWin, t }: { user: any, onWin: () => void, t: any }) {
+function TicTacToe({ user, onWin, t, addNotification }: { user: any, onWin: () => void, t: any, addNotification: (m: string, type?: any) => void }) {
   const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
   const [isXNext, setIsXNext] = useState(true);
   const [winner, setWinner] = useState<string | null>(null);
@@ -824,7 +906,7 @@ function TicTacToe({ user, onWin, t }: { user: any, onWin: () => void, t: any })
         setStatus('gameOver');
       }
       if (msg.type === 'opponentLeft') {
-        alert('Opponent left the game.');
+        addNotification('Opponent left the game.', 'info');
         reset();
       }
     };
@@ -840,13 +922,13 @@ function TicTacToe({ user, onWin, t }: { user: any, onWin: () => void, t: any })
     setStatus('idle');
   };
 
-  if (['Normal'].includes(user.status)) {
+  if (!user || user.status === 'Normal') {
     return (
       <div className="bg-paper/30 rounded-3xl p-12 text-center border border-dashed border-border space-y-4">
         <Lock size={48} className="mx-auto text-ink/10" />
         <h3 className="text-xl font-display italic text-ink">Access Restricted</h3>
         <p className="text-sm text-ink/60">You need <span className="text-gold font-bold">Advanced</span> status or higher to play the minigame and earn discounts.</p>
-        <p className="text-[10px] text-ink/40 uppercase tracking-widest">Current Status: {user.status}</p>
+        <p className="text-[10px] text-ink/40 uppercase tracking-widest">Current Status: {user?.status || 'Guest'}</p>
       </div>
     );
   }
@@ -921,11 +1003,49 @@ function TicTacToe({ user, onWin, t }: { user: any, onWin: () => void, t: any })
   );
 }
 
-function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { user: any, t: any, favorites: any[], onRemoveFavorite: (item: any) => void, refreshUser: () => void }) {
+function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addNotification }: { user: any, t: any, favorites: any[], onRemoveFavorite: (item: any) => void, refreshUser: () => void, addNotification: (m: string, type?: any) => void }) {
   const [bookings, setBookings] = useState<any[]>([]);
   const [offers, setOffers] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'bookings' | 'favorites'>('bookings');
+  const [activeTab, setActiveTab] = useState<'bookings' | 'favorites' | 'market' | 'game' | 'profile'>('bookings');
   const [isRedeeming, setIsRedeeming] = useState<string | null>(null);
+
+  // Profile state
+  const [profileName, setProfileName] = useState(user?.name || '');
+  const [profileAvatar, setProfileAvatar] = useState(user?.avatar_url || '');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+
+  const avatars = [
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Milo',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Lilly',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Jasper',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Sasha',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Toby',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Oliver',
+    'https://api.dicebear.com/7.x/avataaars/svg?seed=Bella',
+  ];
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdatingProfile(true);
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: profileName, avatar_url: profileAvatar }),
+      });
+      if (res.ok) {
+        refreshUser();
+        addNotification('Profile updated successfully!', 'success');
+      }
+    } catch (err) {
+      console.error('Profile update failed:', err);
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/bookings')
@@ -947,7 +1067,7 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { 
 
   const handleRedeem = async (offer: any) => {
     if (user.bonus < offer.discountPoints) {
-      alert('Insufficient bonus points');
+      addNotification('Insufficient bonus points', 'error');
       return;
     }
 
@@ -956,14 +1076,18 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { 
       const res = await fetch('/api/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ offerId: offer.id, points: offer.discountPoints })
+        body: JSON.stringify({ offerId: offer.id, points: Number(offer.discountPoints) })
       });
+      const data = await res.json();
       if (res.ok) {
-        alert(`Successfully redeemed! You saved €${offer.discountValue} on ${offer.name}. Your voucher code is: ITALIA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`);
+        addNotification(`Successfully redeemed! Voucher: ITALIA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`, 'success');
         refreshUser();
+      } else {
+        addNotification(data.error || 'Redemption failed', 'error');
       }
     } catch (err) {
       console.error('Redemption failed:', err);
+      addNotification('Connection error during redemption', 'error');
     } finally {
       setIsRedeeming(null);
     }
@@ -1015,6 +1139,12 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { 
           {!user.last_game_win && user.status !== 'Normal' && (
             <span className="flex h-2 w-2 rounded-full bg-gold animate-pulse" />
           )}
+        </button>
+        <button 
+          onClick={() => setActiveTab('profile')}
+          className={`px-8 py-4 text-sm font-bold uppercase tracking-widest transition-all border-b-2 ${activeTab === 'profile' ? 'border-gold text-ink' : 'border-transparent text-ink/40'}`}
+        >
+          Profile
         </button>
       </div>
 
@@ -1107,7 +1237,7 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { 
                 {favorites.map((item, i) => (
                   <div key={i} className="luxury-card group">
                     <div className="h-48 overflow-hidden relative">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                      <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                       <button 
                         onClick={() => onRemoveFavorite(item)}
                         className="absolute top-4 right-4 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg"
@@ -1147,7 +1277,7 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { 
                 {offers.map((offer) => (
                   <div key={offer.id} className="luxury-card group">
                     <div className="h-48 overflow-hidden relative">
-                      <img src={offer.image} alt={offer.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      <img src={offer.image || undefined} alt={offer.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                       <div className="absolute top-4 right-4 bg-gold text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg">
                         Save €{offer.discountValue}
                       </div>
@@ -1190,10 +1320,105 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser }: { 
             <TicTacToe 
               user={user} 
               t={t} 
+              addNotification={addNotification}
               onWin={() => {
                 fetch('/api/game-win', { method: 'POST' }).then(() => refreshUser());
               }} 
             />
+          )}
+          {activeTab === 'profile' && (
+            <div className="space-y-8">
+              <h2 className="text-2xl font-display italic text-ink">Profile Settings</h2>
+              <div className="bg-card rounded-[2.5rem] border border-border p-8 shadow-sm">
+                <form onSubmit={handleUpdateProfile} className="space-y-8">
+                  <div className="flex flex-col md:flex-row items-center gap-8">
+                    <div className="relative group">
+                      {profileAvatar ? (
+                        <img src={profileAvatar} alt="Avatar" className="w-32 h-32 rounded-full object-cover border-4 border-gold shadow-xl" />
+                      ) : (
+                        <div className="w-32 h-32 bg-gold rounded-full flex items-center justify-center text-4xl text-white font-bold shadow-xl">
+                          {profileName[0]}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <Camera className="text-white" size={32} />
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 space-y-4">
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-ink/40">Choose an Avatar</h4>
+                      <div className="flex flex-wrap gap-3">
+                        {avatars.map((av, i) => (
+                          <button 
+                            key={i}
+                            type="button"
+                            onClick={() => setProfileAvatar(av)}
+                            className={`w-12 h-12 rounded-full overflow-hidden border-2 transition-all hover:scale-110 ${profileAvatar === av ? 'border-gold shadow-lg scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                          >
+                            <img src={av} alt="Avatar option" className="w-full h-full object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                      <div className="relative pt-2">
+                        <Upload className="absolute left-4 top-[calc(50%+4px)] -translate-y-1/2 text-ink/20" size={16} />
+                        <input 
+                          type="text" 
+                          placeholder="Or paste a custom image URL" 
+                          value={profileAvatar}
+                          onChange={(e) => setProfileAvatar(e.target.value)}
+                          className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-3 outline-none focus:ring-1 focus:ring-gold text-ink text-xs" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Full Name</label>
+                      <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
+                        <input 
+                          type="text" 
+                          placeholder="Full Name" 
+                          required
+                          value={profileName}
+                          onChange={(e) => setProfileName(e.target.value)}
+                          className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" 
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Email Address</label>
+                      <div className="relative">
+                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
+                        <input 
+                          type="email" 
+                          disabled
+                          value={user.email}
+                          className="w-full bg-paper/20 border-none rounded-2xl pl-12 pr-4 py-4 outline-none text-ink/40 cursor-not-allowed" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4">
+                    <button 
+                      disabled={isUpdatingProfile}
+                      className="btn-luxury px-12 py-4 flex items-center gap-3"
+                    >
+                      {isUpdatingProfile ? (
+                        <motion.div 
+                          animate={{ rotate: 360 }}
+                          transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                          className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                        />
+                      ) : <Sparkles size={18} />}
+                      {isUpdatingProfile ? 'Saving Changes...' : 'Save Profile Settings'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           )}
         </div>
 
@@ -1255,6 +1480,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
+  const [bonusEarned, setBonusEarned] = useState(0);
 
   const minigameDiscount = user?.last_game_win ? basketTotal * 0.1 : 0;
   const pointsToUse = usePoints ? Math.min(user?.bonus || 0, Math.floor((basketTotal - minigameDiscount) * 10)) : 0;
@@ -1263,6 +1489,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
 
   const handlePayment = async () => {
     setIsProcessing(true);
+    let totalBonus = 0;
     
     // Distribute points across items (simplified: use all on first item or split)
     let remainingPoints = pointsToUse;
@@ -1272,7 +1499,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
       const itemPoints = i === basket.length - 1 ? remainingPoints : Math.min(remainingPoints, Math.floor(item.price * 10));
       remainingPoints -= itemPoints;
 
-      await fetch('/api/bookings', {
+      const response = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1284,7 +1511,11 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
           minigameDiscount: !!user?.last_game_win
         })
       });
+      const data = await response.json();
+      totalBonus += data.bonusEarned || 0;
     }
+    
+    setBonusEarned(totalBonus);
     
     setTimeout(() => {
       setIsProcessing(false);
@@ -1305,6 +1536,11 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
         </motion.div>
         <h1 className="text-4xl font-display italic text-ink">Payment Successful!</h1>
         <p className="text-ink/60">Your bookings are confirmed. We've sent the details to your email.</p>
+        <div className="bg-paper p-6 rounded-3xl border border-border inline-block">
+          <p className="text-sm font-bold text-ink uppercase tracking-widest mb-1">Bonus Points Earned</p>
+          <p className="text-3xl font-display text-gold">+{bonusEarned}</p>
+          <p className="text-[10px] text-ink/40 mt-2 italic">15% of your purchase has been added to your wallet</p>
+        </div>
         <div className="pt-8 flex gap-4 justify-center">
           <button onClick={() => setView('dashboard')} className="btn-luxury">Go to Dashboard</button>
           <button onClick={() => setView('home')} className="btn-outline">Back to Home</button>
@@ -1412,7 +1648,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
               <div className="max-h-96 overflow-y-auto space-y-4 pr-2">
                 {basket.map((item) => (
                   <div key={item.basketId} className="flex gap-4 pb-4 border-b border-border last:border-0">
-                    <img src={item.image} className="w-16 h-16 rounded-xl object-cover" />
+                    <img src={item.image || undefined} className="w-16 h-16 rounded-xl object-cover" />
                     <div className="flex-1">
                       <h4 className="font-bold text-sm text-ink">{item.name}</h4>
                       <p className="text-[10px] text-ink/60">{item.location} • {item.duration || 'Experience'}</p>
@@ -1691,24 +1927,24 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
             className="luxury-card group cursor-pointer"
           >
             <div className="h-64 overflow-hidden relative">
-              <img src={item.image} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-              <div className="absolute top-4 right-4 flex flex-col gap-2">
+              <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+              <div className="absolute top-4 right-4">
                 <div className="bg-card/90 backdrop-blur px-3 py-1 rounded-full flex items-center gap-1">
                   {Array.from({ length: item.stars }).map((_, j) => (
                     <Star key={j} size={10} fill="currentColor" className="text-gold" />
                   ))}
                 </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                    favorites.some(f => f.id === item.id) 
-                      ? 'bg-red-500 text-white' 
-                      : 'bg-card/90 backdrop-blur text-ink/40 hover:text-red-500'
-                  }`}
-                >
-                  <Heart size={14} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
-                </button>
               </div>
+              <button 
+                onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
+                className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10 ${
+                  favorites.some(f => f.id === item.id) 
+                    ? 'bg-red-500 text-white' 
+                    : 'bg-card/90 backdrop-blur text-ink/40 hover:text-red-500'
+                }`}
+              >
+                <Heart size={14} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
+              </button>
             </div>
             <div className="p-6 space-y-4 bg-card">
               <div className="flex justify-between items-start">
@@ -1763,7 +1999,7 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
               
               <div className="overflow-y-auto flex-1">
                 <div className="h-64 overflow-hidden">
-                  <img src={selectedItem.image} alt={selectedItem.name} className="w-full h-full object-cover" />
+                  <img src={selectedItem.image || undefined} alt={selectedItem.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 
                 <div className="p-8 space-y-6">
@@ -1857,7 +2093,7 @@ function Suggestions({ t }: { t: any }) {
             className="bg-card rounded-2xl overflow-hidden border border-border shadow-sm group cursor-pointer"
           >
             <div className="h-32 relative overflow-hidden">
-              <img src={item.image} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+              <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
               <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg text-[10px] font-bold text-gold">
                 {(item.type || 'item').toUpperCase()}
               </div>
@@ -2223,7 +2459,7 @@ function TaxiView({ t, lang, user, refreshUser }: { t: any, lang: string, user: 
 
                     {rideStatus !== 'searching' && (
                       <div className="bg-paper/50 p-4 rounded-2xl flex items-center gap-4">
-                        <img src={VEHICLES[selectedCar].driver.photo} alt="Driver" className="w-12 h-12 rounded-full object-cover border-2 border-gold" />
+                        <img src={VEHICLES[selectedCar].driver.photo || undefined} alt="Driver" className="w-12 h-12 rounded-full object-cover border-2 border-gold" referrerPolicy="no-referrer" />
                         <div className="flex-1">
                           <div className="flex justify-between items-center">
                             <span className="font-bold text-ink">{VEHICLES[selectedCar].driver.name}</span>
@@ -2314,7 +2550,7 @@ function TaxiView({ t, lang, user, refreshUser }: { t: any, lang: string, user: 
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-paper rounded-xl overflow-hidden">
-                      <img src={v.image} alt={v.name} className="w-full h-full object-cover" />
+                      <img src={v.image || undefined} alt={v.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-ink">{v.name}</h4>
@@ -2509,3 +2745,4 @@ function AuthModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: (us
     </div>
   );
 }
+

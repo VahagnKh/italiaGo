@@ -4,6 +4,7 @@ export interface User {
   name: string;
   wallet_balance: number;
   bonus: number;
+  avatar_url?: string;
 }
 
 export interface Booking {
