@@ -5,6 +5,7 @@ import {
   Calendar, 
   Star, 
   ArrowRight, 
+  ArrowLeft,
   Utensils, 
   Hotel, 
   Car, 
@@ -31,8 +32,32 @@ import {
   LayoutDashboard,
   Camera,
   Upload,
-  Shield
+  Shield,
+  Search,
+  BookOpen,
+  CheckSquare,
+  Users,
+  Settings,
+  Bell,
+  MoreVertical,
+  Play,
+  Filter,
+  ChevronRight,
+  ChevronLeft,
+  Award,
+  Clock,
+  Send
 } from 'lucide-react';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
 
 import { useLanguage } from './contexts/LanguageContext';
 import AdminView from './components/AdminView';
@@ -96,7 +121,7 @@ const STORIES = [
 
 export default function App() {
   const { language: lang, setLanguage: setLang, t } = useLanguage();
-  const [view, setView] = useState<'home' | 'dashboard' | 'checkout' | 'hotels' | 'restaurants' | 'tours' | 'taxi' | 'experiences' | 'rentals' | 'events'>('home');
+  const [view, setView] = useState<'home' | 'checkout' | 'hotels' | 'restaurants' | 'tours' | 'taxi' | 'experiences' | 'rentals' | 'events' | 'overview' | 'inbox' | 'lessons' | 'tasks' | 'groups' | 'friends' | 'settings'>('home');
   const [initialFilter, setInitialFilter] = useState('all');
   const [initialPriceFilter, setInitialPriceFilter] = useState('all');
   const [initialSearch, setInitialSearch] = useState('');
@@ -132,9 +157,19 @@ export default function App() {
   useEffect(() => {
     fetch('/api/listings')
       .then(res => res.json())
-      .then(data => setListings(data))
+      .then(data => setListings(Array.isArray(data) ? data : []))
       .catch(err => console.error(err));
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetch('/api/log-activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'PAGE_VISIT', page: view })
+      }).catch(console.error);
+    }
+  }, [view, user]);
 
   const HOTELS = listings.filter(l => l.type === 'hotel');
   const RESTAURANTS = listings.filter(l => l.type === 'restaurant');
@@ -188,10 +223,48 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    if (user && view === 'home') {
+      setView('overview');
+    }
+  }, [user]);
+
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Navbar */}
-      <nav className="fixed top-0 w-full z-40 bg-nav backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center transition-colors">
+    <div className="min-h-screen flex flex-col bg-[#F8F9FB]">
+      {user && view !== 'home' && view !== 'checkout' ? (
+        <div className="flex h-screen overflow-hidden">
+          <Sidebar view={view} setView={setView} user={user} setUser={setUser} setShowAdmin={setShowAdmin} />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <TopBar setView={setView} user={user} />
+            <main className="flex-1 overflow-y-auto p-4 sm:p-8">
+              {view === 'overview' && <DashboardHome user={user} setView={setView} />}
+              {view === 'inbox' && <InboxView user={user} />}
+              {view === 'lessons' && <LessonsView user={user} />}
+              {view === 'tasks' && <TasksView user={user} />}
+              {view === 'groups' && <GroupsView user={user} />}
+              {view === 'friends' && <FriendsView user={user} />}
+              {view === 'settings' && <SettingsView user={user} setUser={setUser} />}
+              
+              {/* Fallback for old views if needed */}
+              {['hotels', 'restaurants', 'experiences', 'tours', 'rentals', 'events', 'taxi'].includes(view) && (
+                <div className="max-w-7xl mx-auto">
+                   <button onClick={() => setView('overview')} className="mb-4 flex items-center gap-2 text-ink/60 hover:text-ink transition-colors">
+                     <ArrowLeft size={16} /> Back to Dashboard
+                   </button>
+                   {view === 'hotels' && <ListView items={HOTELS} type="hotel" title={t.hotels} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+                   {view === 'restaurants' && <ListView items={RESTAURANTS} type="restaurant" title={t.restaurants} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+                   {view === 'experiences' && <ListView items={EXPERIENCES} type="experience" title={t.experiences} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+                   {view === 'tours' && <ListView items={TOURS} type="tour" title={t.tours} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+                </div>
+              )}
+            </main>
+          </div>
+          <RightPanel user={user} />
+        </div>
+      ) : (
+        <>
+          {/* Navbar */}
+          <nav className="fixed top-0 w-full z-40 bg-nav backdrop-blur-md border-b border-border px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center transition-colors">
         <div className="flex items-center gap-1 sm:gap-4">
           <button 
             onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -385,20 +458,6 @@ export default function App() {
                           <p className="text-sm font-bold text-ink truncate">{user.email}</p>
                         </div>
                         <div className="p-2">
-                          <button 
-                            onClick={() => { setView('dashboard'); setShowProfileMenu(false); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-ink hover:bg-paper transition-colors"
-                          >
-                            <LayoutDashboard size={16} className="text-gold" />
-                            Dashboard
-                          </button>
-                          <button 
-                            onClick={() => { setView('dashboard'); setShowProfileMenu(false); /* We'll trigger the tab change via a global state or just let the user click it in dashboard */ }}
-                            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-ink hover:bg-paper transition-colors"
-                          >
-                            <User size={16} className="text-gold" />
-                            My Profile
-                          </button>
                           {user.role === 'admin' && (
                             <button 
                               onClick={() => { setShowAdmin(true); setShowProfileMenu(false); }}
@@ -432,7 +491,6 @@ export default function App() {
 
       <main className="flex-1 pt-20">
         {view === 'home' && <HomeView setView={setView} t={t} lang={lang} setInfoModal={setInfoModal} setInitialFilter={setInitialFilter} addNotification={addNotification} />}
-        {view === 'dashboard' && <DashboardView user={user} t={t} favorites={favorites} onRemoveFavorite={toggleFavorite} refreshUser={refreshUser} addNotification={addNotification} />}
         {view === 'checkout' && <CheckoutView setView={setView} basket={basket} basketTotal={basketTotal} onPaymentSuccess={() => { setBasket([]); refreshUser(); }} user={user} />}
         {view === 'hotels' && <ListView items={HOTELS} type="hotel" title={t.hotels} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
         {view === 'restaurants' && <ListView items={RESTAURANTS} type="restaurant" title={t.restaurants} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
@@ -540,10 +598,12 @@ export default function App() {
           ))}
         </AnimatePresence>
       </div>
+    </>
+  )}
 
       <AIConcierge isOpen={showAI} setIsOpen={setShowAI} />
       <AnimatePresence>
-        {showAdmin && <AdminView onClose={() => { setShowAdmin(false); fetch('/api/listings').then(res => res.json()).then(data => setListings(data)); }} />}
+        {showAdmin && <AdminView onClose={() => { setShowAdmin(false); fetch('/api/listings').then(res => res.json()).then(data => setListings(Array.isArray(data) ? data : [])); }} />}
       </AnimatePresence>
       
       <AnimatePresence>
@@ -1050,11 +1110,11 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
   useEffect(() => {
     fetch('/api/bookings')
       .then(res => res.json())
-      .then(data => setBookings(data));
+      .then(data => setBookings(Array.isArray(data) ? data : []));
     
     fetch('/api/offers')
       .then(res => res.json())
-      .then(data => setOffers(data));
+      .then(data => setOffers(Array.isArray(data) ? data : []));
   }, []);
 
   if (!user) {
@@ -1476,6 +1536,876 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
   );
 }
 
+
+function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string, setView: (v: any) => void, user: any, setUser: (u: any) => void, setShowAdmin: (s: boolean) => void }) {
+  const menuItems = [
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+    { id: 'inbox', label: 'Inbox', icon: MessageSquare },
+    { id: 'lessons', label: 'Lesson', icon: BookOpen },
+    { id: 'tasks', label: 'Task', icon: CheckSquare },
+    { id: 'groups', label: 'Group', icon: Users },
+  ];
+
+  const [friends, setFriends] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/friends')
+      .then(res => res.json())
+      .then(data => setFriends(Array.isArray(data) ? data : []))
+      .catch(console.error);
+  }, []);
+
+  return (
+    <div className="hidden lg:flex flex-col w-64 bg-white border-r border-gray-100 h-full p-6">
+      <div className="flex items-center gap-3 mb-12">
+        <div className="w-10 h-10 bg-[#7C3AED] rounded-xl flex items-center justify-center text-white">
+          <Sparkles size={24} />
+        </div>
+        <span className="text-xl font-bold tracking-tight text-gray-900 uppercase">Coursue</span>
+      </div>
+
+      <div className="space-y-8 flex-1">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 px-4">Overview</p>
+          <div className="space-y-1">
+            {menuItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setView(item.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                  view === item.id ? 'bg-[#7C3AED]/10 text-[#7C3AED]' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+                }`}
+              >
+                <item.icon size={18} />
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 px-4">Friends</p>
+          <div className="space-y-4 px-4">
+            {friends.map((friend, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100">
+                  <img src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`} alt={friend.name} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-900">{friend.name}</p>
+                  <p className="text-[10px] text-gray-400">{friend.role}</p>
+                </div>
+              </div>
+            ))}
+            {friends.length === 0 && (
+              <p className="text-[10px] italic text-gray-400">No friends yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-8 border-t border-gray-100 space-y-1">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 px-4">Settings</p>
+        <button
+          onClick={() => setView('settings')}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+            view === 'settings' ? 'bg-[#7C3AED]/10 text-[#7C3AED]' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+          }`}
+        >
+          <Settings size={18} />
+          Settings
+        </button>
+        {user.role === 'admin' && (
+          <button
+            onClick={() => setShowAdmin(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gold hover:bg-gold/5 transition-all"
+          >
+            <Shield size={18} />
+            Admin Panel
+          </button>
+        )}
+        <button
+          onClick={() => { setUser(null); setView('home'); }}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-50 transition-all"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ setView, user }: { setView: (v: any) => void, user: any }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<any>(null);
+
+  useEffect(() => {
+    if (query.length > 2) {
+      fetch(`/api/search?q=${query}`)
+        .then(res => res.json())
+        .then(data => setResults(data));
+    } else {
+      setResults(null);
+    }
+  }, [query]);
+
+  return (
+    <header className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-30">
+      <div className="relative w-full max-w-xl">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <input
+          type="text"
+          placeholder="Search your course here...."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full bg-gray-50 border-none rounded-2xl pl-12 pr-12 py-3 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
+        />
+        <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+          <Filter size={18} />
+        </button>
+
+        {results && results.courses && results.mentors && (
+          <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+            <div className="p-4 space-y-4">
+              {results.courses.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Courses</p>
+                  <div className="space-y-2">
+                    {results.courses.map((c: any) => (
+                      <button key={c.id} className="w-full text-left p-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden">
+                          <img src={c.image} alt={c.title} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 truncate">{c.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {results.mentors.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Mentors</p>
+                  <div className="space-y-2">
+                    {results.mentors.map((m: any) => (
+                      <button key={m.id} className="w-full text-left p-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden">
+                          <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{m.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button className="p-2 text-gray-400 hover:bg-gray-50 rounded-xl transition-colors relative">
+          <Bell size={20} />
+          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+        </button>
+        <div className="h-8 w-px bg-gray-100 mx-2" />
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-bold text-gray-900">{user.name}</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest">{user.role}</p>
+          </div>
+          <button onClick={() => setView('settings')} className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
+            <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function DashboardHome({ user, setView }: { user: any, setView: (v: any) => void }) {
+  const [courses, setCourses] = useState<any[]>([]);
+  const [progress, setProgress] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/courses')
+      .then(res => res.json())
+      .then(data => setCourses(Array.isArray(data) ? data : []));
+    
+    fetch('/api/user/progress')
+      .then(res => res.json())
+      .then(data => setProgress(Array.isArray(data) ? data : []));
+  }, []);
+
+  return (
+    <div className="space-y-10">
+      {/* Banner */}
+      <div className="relative bg-[#7C3AED] rounded-[2.5rem] p-8 sm:p-12 overflow-hidden text-white">
+        <div className="relative z-10 max-w-lg space-y-6">
+          <p className="text-xs font-bold uppercase tracking-widest opacity-80">Online Course</p>
+          <h1 className="text-3xl sm:text-5xl font-bold leading-tight">Sharpen Your Skills With Professional Online Courses</h1>
+          <button 
+            onClick={() => setView('lessons')}
+            className="bg-white text-[#7C3AED] px-8 py-4 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-gray-100 transition-colors"
+          >
+            Join Now <Play size={16} fill="currentColor" />
+          </button>
+        </div>
+        <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
+          <Sparkles className="w-full h-full" />
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-white p-6 rounded-3xl border border-gray-100 flex items-center justify-between group hover:shadow-xl hover:shadow-gray-200/50 transition-all cursor-pointer">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#7C3AED]/10 rounded-2xl flex items-center justify-center text-[#7C3AED]">
+                <Bell size={24} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">2/8 Watched</p>
+                <p className="text-sm font-bold text-gray-900">Product Design</p>
+              </div>
+            </div>
+            <button className="text-gray-300 group-hover:text-gray-600 transition-colors">
+              <MoreVertical size={18} />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Continue Watching */}
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-900">Continue Watching</h2>
+          <div className="flex gap-2">
+            <button className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
+              <ChevronLeft size={18} />
+            </button>
+            <button className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course, i) => (
+            <div key={i} className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 group hover:shadow-xl transition-all">
+              <div className="h-48 relative overflow-hidden">
+                <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-[#7C3AED]">
+                  {course.category}
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                <h3 className="font-bold text-gray-900 leading-snug line-clamp-2">{course.title}</h3>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden">
+                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${course.instructor}`} alt={course.instructor} />
+                  </div>
+                  <span className="text-xs text-gray-400">{course.instructor}</span>
+                </div>
+                <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
+                   <div className="flex-1 mr-4">
+                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                       <div className="h-full bg-[#7C3AED]" style={{ width: '45%' }} />
+                     </div>
+                   </div>
+                   <button onClick={() => setView('lessons')} className="text-[#7C3AED] hover:underline text-xs font-bold">Continue</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Mentors Table */}
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+        <div className="p-8 flex justify-between items-center border-b border-gray-50">
+          <h2 className="text-xl font-bold text-gray-900">Your Mentor</h2>
+          <button className="text-[#7C3AED] text-xs font-bold hover:underline">See All</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+                <th className="px-8 py-6">Instructor Name & Date</th>
+                <th className="px-8 py-6">Course Type</th>
+                <th className="px-8 py-6">Course Title</th>
+                <th className="px-8 py-6 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {[1, 2].map(i => (
+                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden">
+                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Mentor${i}`} alt="Mentor" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">Prashant Kumar Singh</p>
+                        <p className="text-[10px] text-gray-400">25/2/2023</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="px-3 py-1 bg-[#7C3AED]/10 text-[#7C3AED] rounded-full text-[10px] font-bold uppercase tracking-widest">Frontend</span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <p className="text-sm text-gray-600">Understanding Concept Of React</p>
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <button className="text-[#7C3AED] text-xs font-bold bg-[#7C3AED]/10 px-4 py-2 rounded-xl hover:bg-[#7C3AED] hover:text-white transition-all">Show Details</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RightPanel({ user }: { user: any }) {
+  const [mentors, setMentors] = useState<any[]>([]);
+  const data = [
+    { name: 'Mon', value: 30 },
+    { name: 'Tue', value: 45 },
+    { name: 'Wed', value: 60 },
+    { name: 'Thu', value: 40 },
+    { name: 'Fri', value: 80 },
+    { name: 'Sat', value: 95 },
+    { name: 'Sun', value: 50 },
+  ];
+
+  useEffect(() => {
+    fetch('/api/mentors')
+      .then(res => res.json())
+      .then(data => setMentors(Array.isArray(data) ? data : []))
+      .catch(console.error);
+  }, []);
+
+  const handleFollow = (id: number) => {
+    fetch('/api/mentors/follow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mentorId: id })
+    })
+    .then(res => res.json())
+    .then(data => {
+      setMentors(prev => prev.map(m => m.id === id ? { ...m, isFollowed: data.followed } : m));
+    });
+  };
+
+  return (
+    <div className="hidden xl:flex flex-col w-80 bg-white border-l border-gray-100 h-full p-8 overflow-y-auto space-y-10">
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-bold text-gray-900">Your Profile</h2>
+        <button className="text-gray-400 hover:text-gray-600">
+          <MoreVertical size={20} />
+        </button>
+      </div>
+
+      <div className="text-center space-y-4">
+        <div className="relative inline-block">
+          <div className="w-24 h-24 rounded-full p-1 border-2 border-[#7C3AED] border-t-transparent animate-spin-slow">
+            <div className="w-full h-full rounded-full overflow-hidden border-2 border-white">
+              <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
+            </div>
+          </div>
+          <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-4 border-white rounded-full" />
+        </div>
+        <div>
+          <h3 className="text-xl font-bold text-gray-900">Good Morning {user.name.split(' ')[0]}</h3>
+          <p className="text-xs text-gray-400 mt-1">Continue Your Journey And Achieve Your Target</p>
+        </div>
+      </div>
+
+      <div className="flex justify-center gap-4">
+        <button className="w-10 h-10 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
+          <Bell size={18} />
+        </button>
+        <button className="w-10 h-10 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
+          <ShoppingBag size={18} />
+        </button>
+        <button className="w-10 h-10 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
+          <Mail size={18} />
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div className="h-40 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data}>
+              <Tooltip 
+                cursor={{ fill: '#F3F4F6' }}
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    return (
+                      <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 text-[10px] font-bold">
+                        {payload[0].value}%
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={index === 5 ? '#7C3AED' : '#E5E7EB'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">
+          <span>Learning Progress</span>
+          <span className="text-[#7C3AED]">75%</span>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-bold text-gray-900">Your Mentor</h2>
+          <button className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
+            <ArrowRight size={14} />
+          </button>
+        </div>
+        <div className="space-y-4">
+          {mentors.map((mentor, i) => (
+            <div key={i} className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100">
+                  <img src={mentor.avatar} alt={mentor.name} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-gray-900">{mentor.name}</p>
+                  <p className="text-[10px] text-gray-400">{mentor.role}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => handleFollow(mentor.id)}
+                className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
+                  mentor.isFollowed ? 'bg-gray-100 text-gray-400' : 'bg-[#7C3AED] text-white hover:bg-[#6D28D9]'
+                }`}
+              >
+                {mentor.isFollowed ? 'Followed' : 'Follow'}
+              </button>
+            </div>
+          ))}
+        </div>
+        <button className="w-full py-3 bg-[#7C3AED]/10 text-[#7C3AED] rounded-2xl text-xs font-bold hover:bg-[#7C3AED] hover:text-white transition-all">
+          See All
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function InboxView({ user }: { user: any }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [content, setContent] = useState('');
+
+  useEffect(() => {
+    fetch('/api/messages')
+      .then(res => res.json())
+      .then(data => setMessages(Array.isArray(data) ? data : []));
+  }, []);
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!content.trim()) return;
+    fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ receiverId: 1, content }) // Simplified: send to admin/mentor 1
+    })
+    .then(() => {
+      setContent('');
+      fetch('/api/messages').then(res => res.json()).then(data => setMessages(Array.isArray(data) ? data : []));
+    });
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto h-[calc(100vh-160px)] flex flex-col bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
+      <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+        <h2 className="text-xl font-bold text-gray-900">Inbox</h2>
+        <button className="p-2 text-gray-400 hover:bg-gray-50 rounded-xl transition-colors">
+          <MoreVertical size={20} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex gap-4 ${m.sender_id === user.id ? 'flex-row-reverse' : ''}`}>
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 shrink-0">
+              <img src={m.sender_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.sender_name}`} alt={m.sender_name} />
+            </div>
+            <div className={`max-w-[70%] p-4 rounded-2xl text-sm ${
+              m.sender_id === user.id ? 'bg-[#7C3AED] text-white rounded-tr-none' : 'bg-gray-50 text-gray-900 rounded-tl-none'
+            }`}>
+              <p>{m.content}</p>
+              <p className={`text-[10px] mt-2 opacity-60 ${m.sender_id === user.id ? 'text-white' : 'text-gray-400'}`}>
+                {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+        ))}
+        {messages.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-4">
+            <Mail size={48} className="opacity-10" />
+            <p className="italic">No messages yet. Start a conversation!</p>
+          </div>
+        )}
+      </div>
+      <form onSubmit={handleSend} className="p-6 border-t border-gray-50 flex gap-4">
+        <input
+          type="text"
+          placeholder="Type your message..."
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          className="flex-1 bg-gray-50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
+        />
+        <button type="submit" className="w-14 h-14 bg-[#7C3AED] text-white rounded-2xl flex items-center justify-center hover:bg-[#6D28D9] transition-all shadow-lg shadow-[#7C3AED]/20">
+          <Send size={24} />
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function LessonsView({ user }: { user: any }) {
+  const [courses, setCourses] = useState<any[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/courses')
+      .then(res => res.json())
+      .then(data => setCourses(Array.isArray(data) ? data : []));
+  }, []);
+
+  const fetchCourseDetails = (id: number) => {
+    fetch(`/api/courses/${id}`)
+      .then(res => res.json())
+      .then(data => setSelectedCourse(data));
+  };
+
+  if (selectedCourse) {
+    return (
+      <div className="space-y-8">
+        <button onClick={() => setSelectedCourse(null)} className="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors font-bold text-sm">
+          <ArrowLeft size={18} /> Back to Courses
+        </button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden shadow-2xl relative group">
+              <iframe
+                src={selectedCourse.lessons[0]?.video_url}
+                className="w-full h-full"
+                allowFullScreen
+              />
+            </div>
+            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">{selectedCourse.title}</h1>
+                  <p className="text-gray-400 mt-1">{selectedCourse.instructor}</p>
+                </div>
+                <span className="px-4 py-2 bg-[#7C3AED]/10 text-[#7C3AED] rounded-full text-xs font-bold uppercase tracking-widest">
+                  {selectedCourse.category}
+                </span>
+              </div>
+              <p className="text-gray-600 leading-relaxed">{selectedCourse.description}</p>
+            </div>
+          </div>
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm flex flex-col h-fit">
+            <div className="p-6 border-b border-gray-50">
+              <h3 className="font-bold text-gray-900">Course Content</h3>
+              <p className="text-xs text-gray-400 mt-1">{selectedCourse.lessons.length} Lessons • 2h 45m</p>
+            </div>
+            <div className="divide-y divide-gray-50 overflow-y-auto max-h-[600px]">
+              {selectedCourse.lessons.map((lesson: any, i: number) => (
+                <button key={i} className="w-full p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors text-left group">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
+                    {i === 0 ? <Play size={18} fill="currentColor" /> : <Lock size={18} />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-gray-900">{lesson.title}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{lesson.duration}</p>
+                  </div>
+                  {i === 0 && <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Playing</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900">My Lessons</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {courses.map((course) => (
+          <div key={course.id} className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 group hover:shadow-2xl transition-all flex flex-col">
+            <div className="h-56 relative overflow-hidden">
+              <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <button onClick={() => fetchCourseDetails(course.id)} className="w-16 h-16 bg-white text-[#7C3AED] rounded-full flex items-center justify-center shadow-2xl scale-75 group-hover:scale-100 transition-all">
+                  <Play size={32} fill="currentColor" />
+                </button>
+              </div>
+            </div>
+            <div className="p-8 space-y-6 flex-1 flex flex-col">
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold text-[#7C3AED] uppercase tracking-widest">{course.category}</span>
+                <h3 className="text-lg font-bold text-gray-900 leading-tight">{course.title}</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden">
+                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${course.instructor}`} alt={course.instructor} />
+                </div>
+                <span className="text-xs text-gray-400">{course.instructor}</span>
+              </div>
+              <div className="pt-6 border-t border-gray-50 mt-auto">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progress</span>
+                  <span className="text-[10px] font-bold text-[#7C3AED]">45%</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-[#7C3AED]" style={{ width: '45%' }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TasksView({ user }: { user: any }) {
+  const [tasks, setTasks] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/tasks')
+      .then(res => res.json())
+      .then(data => setTasks(Array.isArray(data) ? data : []));
+  }, []);
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold text-gray-900">Assignments</h2>
+        <div className="flex gap-2">
+          <button className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">All Tasks</button>
+          <button className="px-4 py-2 bg-[#7C3AED] rounded-xl text-xs font-bold text-white shadow-lg shadow-[#7C3AED]/20">Pending</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-6">
+        {tasks.map((task, i) => (
+          <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 group hover:shadow-xl transition-all">
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-[#7C3AED] group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
+                <CheckSquare size={32} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-gray-900">{task.title}</h3>
+                <p className="text-sm text-gray-400">{task.course_title}</p>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <Clock size={12} /> Due: {new Date(task.due_date).toLocaleDateString()}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                    task.status === 'submitted' ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500'
+                  }`}>
+                    {task.status || 'Pending'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <button className="flex-1 md:flex-none px-8 py-4 bg-gray-50 text-gray-600 rounded-2xl text-xs font-bold hover:bg-gray-100 transition-all">View Details</button>
+              <button className="flex-1 md:flex-none px-8 py-4 bg-[#7C3AED] text-white rounded-2xl text-xs font-bold hover:bg-[#6D28D9] transition-all shadow-lg shadow-[#7C3AED]/20">Submit Task</button>
+            </div>
+          </div>
+        ))}
+        {tasks.length === 0 && (
+          <div className="py-20 text-center space-y-4">
+            <CheckSquare size={64} className="mx-auto text-gray-100" />
+            <p className="text-gray-400 italic">No assignments found for your courses.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GroupsView({ user }: { user: any }) {
+  return (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900">Learning Groups</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6 group hover:shadow-xl transition-all">
+            <div className="flex justify-between items-start">
+              <div className="w-16 h-16 bg-[#7C3AED]/10 rounded-[1.5rem] flex items-center justify-center text-[#7C3AED]">
+                <Users size={32} />
+              </div>
+              <button className="text-gray-300 hover:text-gray-600">
+                <MoreVertical size={20} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-bold text-gray-900">React Enthusiasts</h3>
+              <p className="text-sm text-gray-400">A group for sharing React tips and tricks.</p>
+            </div>
+            <div className="flex -space-x-3">
+              {[1, 2, 3, 4].map(j => (
+                <div key={j} className="w-10 h-10 rounded-full border-4 border-white overflow-hidden bg-gray-100">
+                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=User${j}`} alt="Member" />
+                </div>
+              ))}
+              <div className="w-10 h-10 rounded-full border-4 border-white bg-gray-50 flex items-center justify-center text-[10px] font-bold text-gray-400">
+                +12
+              </div>
+            </div>
+            <button className="w-full py-4 bg-gray-50 text-gray-600 rounded-2xl text-xs font-bold hover:bg-[#7C3AED] hover:text-white transition-all">Join Group</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FriendsView({ user }: { user: any }) {
+  const [friends, setFriends] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/friends')
+      .then(res => res.json())
+      .then(data => setFriends(Array.isArray(data) ? data : []));
+  }, []);
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900">My Friends</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {friends.map((friend, i) => (
+          <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 text-center space-y-6 group hover:shadow-xl transition-all">
+            <div className="relative inline-block">
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-50 shadow-lg">
+                <img src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`} alt={friend.name} className="w-full h-full object-cover" />
+              </div>
+              <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full" />
+            </div>
+            <div>
+              <h3 className="font-bold text-gray-900">{friend.name}</h3>
+              <p className="text-xs text-gray-400 mt-1">{friend.role}</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="flex-1 p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-[#7C3AED]/10 hover:text-[#7C3AED] transition-all">
+                <MessageSquare size={18} className="mx-auto" />
+              </button>
+              <button className="flex-1 p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all">
+                <Trash2 size={18} className="mx-auto" />
+              </button>
+            </div>
+          </div>
+        ))}
+        <button className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 text-center space-y-4 hover:border-[#7C3AED] hover:bg-[#7C3AED]/5 transition-all group">
+          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300 group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
+            <Users size={32} />
+          </div>
+          <p className="text-sm font-bold text-gray-400 group-hover:text-[#7C3AED]">Add New Friend</p>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SettingsView({ user, setUser }: { user: any, setUser: (u: any) => void }) {
+  const [name, setName] = useState(user.name);
+  const [avatar, setAvatar] = useState(user.avatar_url || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    fetch('/api/user/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, avatar_url: avatar })
+    })
+    .then(res => res.json())
+    .then(() => {
+      setUser({ ...user, name, avatar_url: avatar });
+      setIsSaving(false);
+    });
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
+      <div className="bg-white p-10 rounded-[2.5rem] border border-gray-100 shadow-sm">
+        <form onSubmit={handleSave} className="space-y-8">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-50 shadow-2xl">
+                <img src={avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`} alt="Avatar" className="w-full h-full object-cover" />
+              </div>
+              <button type="button" className="absolute bottom-0 right-0 w-10 h-10 bg-[#7C3AED] text-white rounded-full flex items-center justify-center border-4 border-white shadow-lg">
+                <Camera size={20} />
+              </button>
+            </div>
+            <div className="w-full">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 ml-4">Avatar URL</label>
+              <input
+                type="text"
+                value={avatar}
+                onChange={(e) => setAvatar(e.target.value)}
+                placeholder="Paste image URL here"
+                className="w-full bg-gray-50 border-none rounded-2xl px-6 py-4 mt-2 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 ml-4">Full Name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-gray-50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 ml-4">Email Address</label>
+              <input
+                type="email"
+                value={user.email}
+                disabled
+                className="w-full bg-gray-100 border-none rounded-2xl px-6 py-4 outline-none text-gray-400 cursor-not-allowed text-sm"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSaving}
+            className="w-full py-5 bg-[#7C3AED] text-white rounded-[1.5rem] font-bold text-sm hover:bg-[#6D28D9] transition-all shadow-xl shadow-[#7C3AED]/20 disabled:opacity-50"
+          >
+            {isSaving ? 'Saving Changes...' : 'Save Changes'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: { setView: any, basket: any[], basketTotal: number, onPaymentSuccess: () => void, user: any }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -1542,8 +2472,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
           <p className="text-[10px] text-ink/40 mt-2 italic">15% of your purchase has been added to your wallet</p>
         </div>
         <div className="pt-8 flex gap-4 justify-center">
-          <button onClick={() => setView('dashboard')} className="btn-luxury">Go to Dashboard</button>
-          <button onClick={() => setView('home')} className="btn-outline">Back to Home</button>
+          <button onClick={() => setView('home')} className="btn-luxury">Back to Home</button>
         </div>
       </div>
     );
@@ -1722,7 +2651,7 @@ function ReviewsSection({ itemId, t, lang, user }: { itemId: string, t: any, lan
   useEffect(() => {
     fetch(`/api/reviews/${itemId}`)
       .then(res => res.json())
-      .then(data => setReviews(data));
+      .then(data => setReviews(Array.isArray(data) ? data : []));
   }, [itemId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2074,7 +3003,7 @@ function Suggestions({ t }: { t: any }) {
   useEffect(() => {
     fetch('/api/suggestions')
       .then(res => res.json())
-      .then(data => setSuggestions(data));
+      .then(data => setSuggestions(Array.isArray(data) ? data : []));
   }, []);
 
   if (suggestions.length === 0) return null;

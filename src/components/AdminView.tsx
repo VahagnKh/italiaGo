@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, 
@@ -17,9 +17,59 @@ import {
   Compass,
   Car,
   Sparkles,
-  Calendar
+  Calendar,
+  Users,
+  ShoppingBag,
+  BarChart3,
+  Settings,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  Bell,
+  Maximize,
+  MessageSquare,
+  Menu,
+  Globe,
+  Layers,
+  FileText,
+  Palette,
+  Terminal,
+  HelpCircle,
+  LogOut,
+  Shield,
+  TrendingUp,
+  UserPlus,
+  Eye,
+  Activity,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  Clock,
+  Send,
+  Filter,
+  RefreshCw,
+  MoreVertical,
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
 
 interface Listing {
   id: string;
@@ -40,24 +90,175 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
   const [listings, setListings] = useState<Listing[]>([]);
   const [editingListing, setEditingListing] = useState<Partial<Listing> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeMenu, setActiveMenu] = useState('dashboard-v1');
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['dashboard', 'management', 'logs']);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [users, setUsers] = useState<any[]>([]);
+  const [allBookings, setAllBookings] = useState<any[]>([]);
+  const [activityLogs, setActivityLogs] = useState<any[]>([]);
+  const [adminLogs, setAdminLogs] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<any[]>([]);
+  const [adminMessages, setAdminMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userFilter, setUserFilter] = useState('all');
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchListings();
+    fetchAllData();
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (activeMenu === 'chat') {
+      scrollToBottom();
+    }
+  }, [adminMessages, activeMenu]);
+
+  const scrollToBottom = () => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const fetchAllData = async () => {
+    setIsLoading(true);
+    await Promise.all([
+      fetchListings(),
+      fetchUsers(),
+      fetchAllBookings(),
+      fetchActivityLogs(),
+      fetchAdminLogs(),
+      fetchNotifications(),
+      fetchAnalytics(),
+      fetchMessages()
+    ]);
+    setIsLoading(false);
+  };
 
   const fetchListings = async () => {
     try {
       const res = await fetch('/api/listings');
       const data = await res.json();
-      setListings(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
+      setListings(Array.isArray(data) ? data : []);
+    } catch (e) { console.error(e); }
   };
 
-  const handleSave = async () => {
+  const fetchUsers = async () => {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchAllBookings = async () => {
+    try {
+      const res = await fetch('/api/admin/bookings');
+      if (res.ok) {
+        const data = await res.json();
+        setAllBookings(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchActivityLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/logs/activity');
+      if (res.ok) {
+        const data = await res.json();
+        setActivityLogs(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchAdminLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/logs/admin');
+      if (res.ok) {
+        const data = await res.json();
+        setAdminLogs(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch('/api/admin/notifications');
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchAnalytics = async () => {
+    try {
+      const res = await fetch('/api/admin/analytics/activity');
+      if (res.ok) {
+        const data = await res.json();
+        setAnalyticsData(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchMessages = async () => {
+    try {
+      const res = await fetch('/api/admin/messages');
+      if (res.ok) {
+        const data = await res.json();
+        setAdminMessages(Array.isArray(data) ? data : []);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+    try {
+      const res = await fetch('/api/admin/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: newMessage })
+      });
+      if (res.ok) {
+        setNewMessage('');
+        fetchMessages();
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const handleUpdateRole = async (userId: number, role: string) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role })
+      });
+      if (res.ok) fetchUsers();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleToggleUserStatus = async (userId: number, currentDisabled: boolean) => {
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disabled: !currentDisabled })
+      });
+      if (res.ok) fetchUsers();
+    } catch (e) { console.error(e); }
+  };
+
+  const toggleMenu = (menuId: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(menuId) ? prev.filter(m => m !== menuId) : [...prev, menuId]
+    );
+  };
+
+  const handleSaveListing = async () => {
     if (!editingListing) return;
     try {
       const res = await fetch('/api/admin/listings', {
@@ -69,268 +270,758 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
         fetchListings();
         setEditingListing(null);
       }
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteListing = async (id: string) => {
     if (!confirm('Are you sure you want to delete this listing?')) return;
     try {
-      const res = await fetch(`/api/admin/listings/${id}`, {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        fetchListings();
-      }
-    } catch (e) {
-      console.error(e);
-    }
+      const res = await fetch(`/api/admin/listings/${id}`, { method: 'DELETE' });
+      if (res.ok) fetchListings();
+    } catch (e) { console.error(e); }
   };
 
-  const types = [
-    { id: 'hotel', icon: Hotel, label: 'Hotel' },
-    { id: 'restaurant', icon: Utensils, label: 'Restaurant' },
-    { id: 'tour', icon: Compass, label: 'Tour' },
-    { id: 'experience', icon: Sparkles, label: 'Experience' },
-    { id: 'rental', icon: Car, label: 'Rental' },
-    { id: 'event', icon: Calendar, label: 'Event' },
+  const menuItems = [
+    { 
+      id: 'dashboard', 
+      label: 'Dashboard', 
+      icon: LayoutDashboard, 
+      children: [
+        { id: 'dashboard-v1', label: 'Dashboard v1' },
+        { id: 'dashboard-v2', label: 'Dashboard v2' },
+        { id: 'dashboard-v3', label: 'Dashboard v3' },
+      ]
+    },
+    {
+      id: 'management',
+      label: 'Management',
+      icon: Shield,
+      children: [
+        { id: 'listings', label: 'Listings', icon: Layers },
+        { id: 'users', label: 'Users', icon: Users },
+        { id: 'bookings', label: 'Bookings', icon: ShoppingBag },
+      ]
+    },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    {
+      id: 'logs',
+      label: 'Logs',
+      icon: FileText,
+      children: [
+        { id: 'activity-logs', label: 'Activity Logs' },
+        { id: 'admin-logs', label: 'Admin Logs' },
+      ]
+    },
+    { id: 'chat', label: 'Admin Chat', icon: MessageSquare },
+    { id: 'security', label: 'Security', icon: Shield },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  const stats = [
+    { label: 'New Orders', value: allBookings.length, color: 'bg-blue-500', icon: ShoppingBag, trend: '+12%', trendUp: true },
+    { label: 'Bounce Rate', value: '53%', color: 'bg-emerald-500', icon: BarChart3, trend: '-2%', trendUp: false },
+    { label: 'User Registrations', value: users.length, color: 'bg-amber-500', icon: UserPlus, trend: '+5%', trendUp: true },
+    { label: 'Unique Visitors', value: '65', color: 'bg-rose-500', icon: Eye, trend: '+18%', trendUp: true },
+  ];
+
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = userFilter === 'all' || u.role === userFilter || (userFilter === 'disabled' && u.disabled);
+    return matchesSearch && matchesFilter;
+  });
+
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
   return (
     <motion.div 
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-paper z-[100] flex flex-col"
+      className="fixed inset-0 bg-[#f4f6f9] z-[100] flex overflow-hidden font-sans text-[#343a40]"
     >
-      {/* Header */}
-      <header className="bg-card border-b border-border px-6 py-4 flex justify-between items-center sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-ink text-paper rounded-xl flex items-center justify-center">
-            <LayoutDashboard size={20} />
-          </div>
-          <div>
-            <h1 className="text-xl font-display italic text-ink">{t.admin}</h1>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Listing Management</p>
-          </div>
+      {/* Sidebar */}
+      <aside className={`bg-[#343a40] text-[#c2c7d0] transition-all duration-300 flex flex-col z-20 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+        <div className="h-14 flex items-center px-4 border-b border-[#4b545c]">
+          <div className="w-8 h-8 bg-gold rounded-full flex items-center justify-center text-white font-bold shrink-0">A</div>
+          {isSidebarOpen && <span className="ml-3 text-xl font-light text-white">AdminLTE 4</span>}
         </div>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setEditingListing({ type: 'hotel', stars: 5, price_level: 'medium', category: 'Standard' })}
-            className="btn-luxury px-6 py-2.5 text-xs flex items-center gap-2"
-          >
-            <Plus size={16} /> {t.addListing}
-          </button>
-          <button onClick={onClose} className="p-2 hover:bg-paper rounded-full transition-colors text-ink">
-            <X size={24} />
-          </button>
-        </div>
-      </header>
 
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-7xl mx-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin" />
+        <div className="flex-1 overflow-y-auto py-4">
+          <div className="px-4 mb-4 pb-4 border-b border-[#4b545c] flex items-center">
+            <div className="w-8 h-8 rounded-full bg-paper/20 overflow-hidden shrink-0">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {listings.map((listing) => (
-                <motion.div 
-                  key={listing.id}
-                  layout
-                  className="bg-card rounded-3xl border border-border overflow-hidden shadow-sm group"
+            {isSidebarOpen && <span className="ml-3 text-sm">Alexander Pierce</span>}
+          </div>
+
+          <nav className="px-2 space-y-1">
+            {menuItems.map((item) => (
+              <div key={item.id}>
+                <button
+                  onClick={() => item.children ? toggleMenu(item.id) : setActiveMenu(item.id)}
+                  className={`w-full flex items-center px-3 py-2 rounded text-sm transition-colors hover:bg-white/10 hover:text-white ${activeMenu.startsWith(item.id) ? 'bg-gold text-white' : ''}`}
                 >
-                  <div className="relative h-48">
-                    <img src={listing.image || undefined} alt={listing.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => setEditingListing(listing)}
-                        className="p-2 bg-white/90 backdrop-blur-sm text-ink rounded-full hover:bg-gold hover:text-white transition-all shadow-lg"
+                  <item.icon size={18} className="shrink-0" />
+                  {isSidebarOpen && (
+                    <>
+                      <span className="ml-3 flex-1 text-left">{item.label}</span>
+                      {item.children && (expandedMenus.includes(item.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                    </>
+                  )}
+                </button>
+                {isSidebarOpen && item.children && expandedMenus.includes(item.id) && (
+                  <div className="mt-1 ml-4 space-y-1">
+                    {item.children.map((child) => (
+                      <button
+                        key={child.id}
+                        onClick={() => setActiveMenu(child.id)}
+                        className={`w-full flex items-center px-3 py-2 rounded text-sm transition-colors hover:bg-white/10 hover:text-white ${activeMenu === child.id ? 'bg-white/10 text-white' : ''}`}
                       >
-                        <Edit2 size={16} />
+                        <div className={`w-1.5 h-1.5 rounded-full border border-current mr-3 ${activeMenu === child.id ? 'bg-current' : ''}`} />
+                        {child.label}
                       </button>
-                      <button 
-                        onClick={() => handleDelete(listing.id)}
-                        className="p-2 bg-white/90 backdrop-blur-sm text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-lg"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </nav>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Navbar */}
+        <header className="h-14 bg-white border-b border-border flex items-center justify-between px-4 shrink-0">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d]"><Menu size={20} /></button>
+            <nav className="hidden md:flex items-center gap-4 text-sm text-[#6c757d]">
+              <button className="hover:text-ink">Home</button>
+              <button className="hover:text-ink">Contact</button>
+            </nav>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d]"><Search size={18} /></button>
+            <div className="relative group">
+              <button className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d] relative">
+                <Bell size={18} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-rose-500 text-white text-[10px] flex items-center justify-center rounded-full">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <div className="p-3 border-b border-border font-bold text-sm flex justify-between items-center">
+                  Notifications
+                  <button onClick={() => fetch('/api/admin/notifications/read', { method: 'POST' }).then(fetchNotifications)} className="text-xs text-blue-500 hover:underline">Mark all as read</button>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {notifications.map(n => (
+                    <div key={n.id} className={`p-3 border-b border-border last:border-0 text-xs ${!n.read ? 'bg-blue-50' : ''}`}>
+                      <p className="font-medium mb-1">{n.message}</p>
+                      <p className="text-[#6c757d]">{new Date(n.created_at).toLocaleString()}</p>
                     </div>
-                    <div className="absolute top-4 left-4">
-                      <span className="px-3 py-1 bg-ink/80 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-widest rounded-full">
-                        {listing.type}
-                      </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d]"><Maximize size={18} /></button>
+            <button onClick={onClose} className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d] ml-2"><X size={20} /></button>
+          </div>
+        </header>
+
+        {/* Content Wrapper */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+          {/* Breadcrumbs */}
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-medium">
+              {activeMenu.startsWith('dashboard') ? 'Dashboard' : 
+               activeMenu === 'listings' ? 'Listing Management' : 
+               activeMenu === 'users' ? 'User Management' : 
+               activeMenu === 'bookings' ? 'Booking Management' : 
+               activeMenu === 'analytics' ? 'Advanced Analytics' :
+               activeMenu === 'activity-logs' ? 'Activity Logs' :
+               activeMenu === 'admin-logs' ? 'Admin Logs' :
+               activeMenu === 'chat' ? 'Admin Chat' :
+               activeMenu === 'security' ? 'Security Monitoring' : 'Admin Panel'}
+            </h1>
+            <div className="flex items-center gap-2 text-sm">
+              <button className="text-blue-500 hover:underline">Home</button>
+              <span className="text-[#6c757d]">/</span>
+              <span className="text-[#6c757d] capitalize">{activeMenu.replace('-', ' ')}</span>
+            </div>
+          </div>
+
+          {/* Dashboard View */}
+          {activeMenu.startsWith('dashboard') && (
+            <div className="space-y-6">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                {stats.map((stat, i) => (
+                  <div key={i} className={`${stat.color} text-white rounded shadow-sm overflow-hidden relative group`}>
+                    <div className="p-4 md:p-5 flex justify-between">
+                      <div className="space-y-1">
+                        <h3 className="text-3xl font-bold">{stat.value}</h3>
+                        <p className="text-sm opacity-80">{stat.label}</p>
+                        <div className="flex items-center gap-1 text-[10px] font-bold">
+                          {stat.trendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                          {stat.trend} Since last month
+                        </div>
+                      </div>
+                      <stat.icon size={56} className="opacity-20 absolute right-2 top-2 group-hover:scale-110 transition-transform" />
+                    </div>
+                    <button className="w-full bg-black/10 py-1 text-xs flex items-center justify-center gap-1 hover:bg-black/20 transition-colors">
+                      More info <Plus size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Charts Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-border flex justify-between items-center bg-[#f8f9fa]">
+                    <h3 className="text-sm font-bold flex items-center gap-2"><Activity size={16} className="text-blue-500" /> Activity Trend</h3>
+                    <div className="flex gap-2">
+                      <button className="text-[10px] font-bold uppercase px-2 py-1 bg-blue-500 text-white rounded">Daily</button>
+                      <button className="text-[10px] font-bold uppercase px-2 py-1 hover:bg-paper rounded">Weekly</button>
                     </div>
                   </div>
-                  <div className="p-6 space-y-4">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-display italic text-xl text-ink">{listing.name}</h3>
-                        <p className="text-xs text-ink/60 flex items-center gap-1">
-                          <MapPin size={12} /> {listing.location}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-display text-gold">€{listing.price}</p>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-ink/40">{listing.category}</p>
+                  <div className="p-4 h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={analyticsData}>
+                        <defs>
+                          <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis fontSize={10} tickLine={false} axisLine={false} />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="count" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCount)" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-border flex justify-between items-center bg-[#f8f9fa]">
+                    <h3 className="text-sm font-bold flex items-center gap-2"><Globe size={16} className="text-emerald-500" /> World Map Analytics</h3>
+                    <button className="p-1 hover:bg-paper rounded"><RefreshCw size={14} /></button>
+                  </div>
+                  <div className="p-4 h-80 flex flex-col items-center justify-center bg-blue-500 text-white relative">
+                    <Globe size={120} className="opacity-20 animate-pulse" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center space-y-4">
+                        <div className="grid grid-cols-2 gap-8">
+                          <div><p className="text-2xl font-bold">8,500</p><p className="text-[10px] uppercase opacity-70">Visitors</p></div>
+                          <div><p className="text-2xl font-bold">2,330</p><p className="text-[10px] uppercase opacity-70">Online</p></div>
+                        </div>
+                        <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20">
+                          <p className="text-xs font-bold mb-2">Top Countries</p>
+                          <div className="space-y-2 text-[10px]">
+                            <div className="flex justify-between"><span>Italy</span><span className="font-bold">45%</span></div>
+                            <div className="w-full bg-white/20 h-1 rounded-full overflow-hidden"><div className="bg-white h-full" style={{width: '45%'}} /></div>
+                            <div className="flex justify-between"><span>USA</span><span className="font-bold">22%</span></div>
+                            <div className="w-full bg-white/20 h-1 rounded-full overflow-hidden"><div className="bg-white h-full" style={{width: '22%'}} /></div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 text-gold">
-                      {Array.from({ length: listing.stars }).map((_, i) => (
-                        <Star key={i} size={12} fill="currentColor" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white rounded border border-border overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">Recent Activity</div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-[#f8f9fa] border-b border-border">
+                          <th className="px-4 py-3">User</th>
+                          <th className="px-4 py-3">Action</th>
+                          <th className="px-4 py-3">Page</th>
+                          <th className="px-4 py-3">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {activityLogs.slice(0, 5).map(log => (
+                          <tr key={log.id} className="hover:bg-[#f8f9fa]">
+                            <td className="px-4 py-3 font-medium">{log.user_name}</td>
+                            <td className="px-4 py-3"><span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded-full font-bold">{log.action}</span></td>
+                            <td className="px-4 py-3 text-[#6c757d]">{log.page}</td>
+                            <td className="px-4 py-3 text-[#6c757d]">{new Date(log.created_at).toLocaleTimeString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">System Health</div>
+                  <div className="p-6 space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs"><span className="font-medium">CPU Usage</span><span className="font-bold">24%</span></div>
+                      <div className="w-full bg-paper h-2 rounded-full overflow-hidden"><div className="bg-blue-500 h-full" style={{width: '24%'}} /></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs"><span className="font-medium">Memory Usage</span><span className="font-bold">68%</span></div>
+                      <div className="w-full bg-paper h-2 rounded-full overflow-hidden"><div className="bg-amber-500 h-full" style={{width: '68%'}} /></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs"><span className="font-medium">Disk Space</span><span className="font-bold">12%</span></div>
+                      <div className="w-full bg-paper h-2 rounded-full overflow-hidden"><div className="bg-emerald-500 h-full" style={{width: '12%'}} /></div>
+                    </div>
+                    <div className="pt-4 border-t border-border flex items-center gap-2 text-emerald-500 font-bold text-xs">
+                      <CheckCircle2 size={16} /> All systems operational
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* User Management View */}
+          {activeMenu === 'users' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-border flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#f8f9fa]">
+                  <div className="flex items-center gap-4 w-full md:w-auto">
+                    <div className="relative flex-1 md:w-64">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6c757d]" size={16} />
+                      <input 
+                        type="text" 
+                        placeholder="Search users..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-border rounded-lg text-sm outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <select 
+                      value={userFilter}
+                      onChange={(e) => setUserFilter(e.target.value)}
+                      className="bg-white border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    >
+                      <option value="all">All Roles</option>
+                      <option value="admin">Administrators</option>
+                      <option value="user">Users</option>
+                      <option value="guest">Guests</option>
+                      <option value="disabled">Disabled</option>
+                    </select>
+                  </div>
+                  <button className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors">
+                    <UserPlus size={16} /> Add User
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-[#f8f9fa] border-b border-border">
+                        <th className="px-4 py-3 font-bold">User</th>
+                        <th className="px-4 py-3 font-bold">Role</th>
+                        <th className="px-4 py-3 font-bold">Last Login</th>
+                        <th className="px-4 py-3 font-bold">Status</th>
+                        <th className="px-4 py-3 font-bold">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {filteredUsers.map((u) => (
+                        <tr key={u.id} className="hover:bg-[#f8f9fa]">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-paper overflow-hidden shrink-0">
+                                <img src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`} alt={u.name} />
+                              </div>
+                              <div>
+                                <p className="font-bold">{u.name}</p>
+                                <p className="text-xs text-[#6c757d]">{u.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <select 
+                              value={u.role}
+                              onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                              className={`px-2 py-1 rounded text-[10px] font-bold uppercase outline-none border border-transparent focus:border-blue-500 ${u.role === 'admin' ? 'bg-rose-100 text-rose-600' : u.role === 'guest' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}
+                            >
+                              <option value="admin">Administrator</option>
+                              <option value="user">User</option>
+                              <option value="guest">Guest</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-3 text-[#6c757d] text-xs">
+                            {u.last_login ? new Date(u.last_login).toLocaleString() : 'Never'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${u.disabled ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                              {u.disabled ? 'Disabled' : 'Active'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => handleToggleUserStatus(u.id, u.disabled)}
+                                className={`p-2 rounded-lg transition-colors ${u.disabled ? 'text-emerald-500 hover:bg-emerald-50' : 'text-amber-500 hover:bg-amber-50'}`}
+                                title={u.disabled ? 'Enable User' : 'Disable User'}
+                              >
+                                {u.disabled ? <Unlock size={16} /> : <Lock size={16} />}
+                              </button>
+                              <button className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="View History">
+                                <Clock size={16} />
+                              </button>
+                              <button className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete User">
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Activity Logs View */}
+          {activeMenu === 'activity-logs' && (
+            <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-border flex justify-between items-center bg-[#f8f9fa]">
+                <h3 className="font-bold text-sm">User Activity Logs</h3>
+                <button onClick={fetchActivityLogs} className="p-2 hover:bg-paper rounded-lg transition-colors"><RefreshCw size={16} /></button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] border-b border-border">
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Page</th>
+                      <th className="px-4 py-3">IP Address</th>
+                      <th className="px-4 py-3">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {activityLogs.map(log => (
+                      <tr key={log.id} className="hover:bg-[#f8f9fa]">
+                        <td className="px-4 py-3">
+                          <p className="font-bold">{log.user_name}</p>
+                          <p className="text-[10px] text-[#6c757d]">{log.user_email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full font-bold ${log.action === 'LOGIN' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[#6c757d]">{log.page}</td>
+                        <td className="px-4 py-3 font-mono text-[#6c757d]">{log.ip || '127.0.0.1'}</td>
+                        <td className="px-4 py-3 text-[#6c757d]">{new Date(log.created_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Logs View */}
+          {activeMenu === 'admin-logs' && (
+            <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+              <div className="p-4 border-b border-border flex justify-between items-center bg-[#f8f9fa]">
+                <h3 className="font-bold text-sm">Administrator Action Logs</h3>
+                <button onClick={fetchAdminLogs} className="p-2 hover:bg-paper rounded-lg transition-colors"><RefreshCw size={16} /></button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] border-b border-border">
+                      <th className="px-4 py-3">Admin</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Target</th>
+                      <th className="px-4 py-3">Changes</th>
+                      <th className="px-4 py-3">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {adminLogs.map(log => (
+                      <tr key={log.id} className="hover:bg-[#f8f9fa]">
+                        <td className="px-4 py-3 font-bold">{log.admin_name}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full font-bold">{log.action}</span>
+                        </td>
+                        <td className="px-4 py-3 text-[#6c757d]">ID: {log.target_id}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-red-500 line-through">{log.old_value}</span>
+                            <ChevronRight size={12} className="text-[#6c757d]" />
+                            <span className="text-emerald-500">{log.new_value}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-[#6c757d]">{new Date(log.created_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Analytics View */}
+          {activeMenu === 'analytics' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 bg-white rounded border border-border overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">User Retention Rate</div>
+                  <div className="p-6 h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={analyticsData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="date" fontSize={10} />
+                        <YAxis fontSize={10} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="count" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                  <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">Traffic Sources</div>
+                  <div className="p-6 h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Direct', value: 400 },
+                            { name: 'Social', value: 300 },
+                            { name: 'Search', value: 300 },
+                            { name: 'Referral', value: 200 },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {COLORS.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="grid grid-cols-2 gap-4 mt-4 text-[10px] font-bold uppercase">
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#0088FE]" /> Direct</div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#00C49F]" /> Social</div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#FFBB28]" /> Search</div>
+                      <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-[#FF8042]" /> Referral</div>
                     </div>
                   </div>
-                </motion.div>
-              ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Chat View */}
+          {activeMenu === 'chat' && (
+            <div className="bg-white rounded border border-border overflow-hidden shadow-sm flex flex-col h-[600px]">
+              <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa] flex justify-between items-center">
+                <div className="flex items-center gap-2"><MessageSquare size={16} className="text-blue-500" /> Admin Internal Chat</div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] uppercase text-[#6c757d]">3 Admins Online</span>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {adminMessages.map((msg, i) => (
+                  <div key={msg.id} className={`flex gap-3 ${msg.sender_id === 1 ? 'flex-row-reverse' : ''}`}>
+                    <div className="w-10 h-10 rounded-full bg-paper overflow-hidden shrink-0 border border-border shadow-sm">
+                      <img src={msg.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender_name}`} alt={msg.sender_name} />
+                    </div>
+                    <div className={`space-y-1 max-w-[70%] ${msg.sender_id === 1 ? 'text-right' : ''}`}>
+                      <div className={`flex items-center gap-2 ${msg.sender_id === 1 ? 'flex-row-reverse' : ''}`}>
+                        <span className="text-xs font-bold">{msg.sender_name}</span>
+                        <span className="text-[10px] text-[#6c757d]">{new Date(msg.created_at).toLocaleTimeString()}</span>
+                      </div>
+                      <div className={`p-3 rounded-2xl text-sm shadow-sm ${msg.sender_id === 1 ? 'bg-blue-500 text-white rounded-tr-none' : 'bg-[#f8f9fa] border border-border rounded-tl-none'}`}>
+                        {msg.message}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+              <form onSubmit={handleSendMessage} className="p-4 border-t border-border bg-[#f8f9fa] flex gap-3">
+                <input 
+                  type="text" 
+                  placeholder="Type your message..." 
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  className="flex-1 bg-white border border-border rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-500"
+                />
+                <button type="submit" className="bg-blue-500 text-white p-2 rounded-xl hover:bg-blue-600 transition-colors">
+                  <Send size={20} />
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Security Monitoring View */}
+          {activeMenu === 'security' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded border border-border shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center"><AlertTriangle size={24} /></div>
+                  <div><p className="text-2xl font-bold">12</p><p className="text-xs text-[#6c757d] font-bold uppercase">Security Alerts</p></div>
+                </div>
+                <div className="bg-white p-6 rounded border border-border shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center"><Lock size={24} /></div>
+                  <div><p className="text-2xl font-bold">3</p><p className="text-xs text-[#6c757d] font-bold uppercase">Locked Accounts</p></div>
+                </div>
+                <div className="bg-white p-6 rounded border border-border shadow-sm flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center"><Shield size={24} /></div>
+                  <div><p className="text-2xl font-bold">Active</p><p className="text-xs text-[#6c757d] font-bold uppercase">Firewall Status</p></div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">Security Incident Logs</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="bg-[#f8f9fa] border-b border-border">
+                        <th className="px-4 py-3">Type</th>
+                        <th className="px-4 py-3">Description</th>
+                        <th className="px-4 py-3">IP Address</th>
+                        <th className="px-4 py-3">Time</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {notifications.filter(n => n.type === 'security').map(n => (
+                        <tr key={n.id} className="hover:bg-rose-50">
+                          <td className="px-4 py-3"><span className="px-2 py-0.5 bg-rose-100 text-rose-600 rounded-full font-bold uppercase text-[10px]">Security</span></td>
+                          <td className="px-4 py-3 font-medium">{n.message}</td>
+                          <td className="px-4 py-3 font-mono text-[#6c757d]">192.168.1.105</td>
+                          <td className="px-4 py-3 text-[#6c757d]">{new Date(n.created_at).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Listings View (Existing) */}
+          {activeMenu === 'listings' && (
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold">Manage Listings</h2>
+                <button 
+                  onClick={() => setEditingListing({ type: 'hotel', stars: 5, price_level: 'medium', category: 'Standard' })}
+                  className="bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors"
+                >
+                  <Plus size={16} /> Add New Listing
+                </button>
+              </div>
+
+              {isLoading ? (
+                <div className="flex items-center justify-center h-64 bg-white rounded border border-border">
+                  <div className="w-10 h-10 border-4 border-gold border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {listings.map((listing) => (
+                    <motion.div key={listing.id} layout className="bg-white rounded border border-border overflow-hidden shadow-sm group">
+                      <div className="relative h-48">
+                        <img src={listing.image || undefined} alt={listing.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => setEditingListing(listing)} className="p-2 bg-white/90 backdrop-blur-sm text-ink rounded-full hover:bg-gold hover:text-white transition-all shadow-lg"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDeleteListing(listing.id)} className="p-2 bg-white/90 backdrop-blur-sm text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-lg"><Trash2 size={16} /></button>
+                        </div>
+                        <div className="absolute top-4 left-4">
+                          <span className="px-3 py-1 bg-ink/80 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-widest rounded-full">{listing.type}</span>
+                        </div>
+                      </div>
+                      <div className="p-6 space-y-4">
+                        <div className="flex justify-between items-start">
+                          <div><h3 className="font-bold text-lg text-ink">{listing.name}</h3><p className="text-xs text-ink/60 flex items-center gap-1"><MapPin size={12} /> {listing.location}</p></div>
+                          <div className="text-right"><p className="text-lg font-bold text-gold">€{listing.price}</p><p className="text-[10px] font-bold uppercase tracking-widest text-ink/40">{listing.category}</p></div>
+                        </div>
+                        <div className="flex items-center gap-1 text-gold">{Array.from({ length: listing.stars }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}</div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
-      </main>
 
-      {/* Edit Modal */}
+        {/* Footer */}
+        <footer className="h-14 bg-white border-t border-border flex items-center justify-between px-6 text-xs text-[#6c757d] shrink-0">
+          <div><span className="font-bold">Copyright © 2024-2025</span> <span className="text-blue-500">AdminLTE.io</span>. All rights reserved.</div>
+          <div><span className="font-bold">Version</span> 4.0.0</div>
+        </footer>
+      </div>
+
+      {/* Edit Listing Modal (Existing) */}
       <AnimatePresence>
         {editingListing && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-ink/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              className="bg-card w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-            >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-ink/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-card w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-8 border-b border-border flex justify-between items-center">
-                <h2 className="text-2xl font-display italic text-ink">
-                  {editingListing.id ? t.editListing : t.addListing}
-                </h2>
-                <button onClick={() => setEditingListing(null)} className="text-ink/40 hover:text-ink">
-                  <X size={24} />
-                </button>
+                <h2 className="text-2xl font-display italic text-ink">{editingListing.id ? t.editListing : t.addListing}</h2>
+                <button onClick={() => setEditingListing(null)} className="text-ink/40 hover:text-ink"><X size={24} /></button>
               </div>
-
               <div className="flex-1 overflow-y-auto p-8 space-y-6">
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.type}</label>
-                    <select 
-                      value={editingListing.type}
-                      onChange={(e) => setEditingListing({ ...editingListing, type: e.target.value })}
-                      className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                    >
-                      {types.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                  <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.type}</label>
+                    <select value={editingListing.type} onChange={(e) => setEditingListing({ ...editingListing, type: e.target.value })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink">
+                      {[{id:'hotel',label:'Hotel'},{id:'restaurant',label:'Restaurant'},{id:'tour',label:'Tour'},{id:'experience',label:'Experience'},{id:'rental',label:'Rental'},{id:'event',label:'Event'}].map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.category}</label>
-                    <select 
-                      value={editingListing.category}
-                      onChange={(e) => setEditingListing({ ...editingListing, category: e.target.value })}
-                      className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                    >
-                      <option value="Budget">Budget</option>
-                      <option value="Standard">Standard</option>
-                      <option value="Premium">Premium</option>
+                  <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.category}</label>
+                    <select value={editingListing.category} onChange={(e) => setEditingListing({ ...editingListing, category: e.target.value })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink">
+                      <option value="Budget">Budget</option><option value="Standard">Standard</option><option value="Premium">Premium</option>
                     </select>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.name}</label>
-                  <input 
-                    type="text"
-                    value={editingListing.name || ''}
-                    onChange={(e) => setEditingListing({ ...editingListing, name: e.target.value })}
-                    className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                  />
+                <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.name}</label>
+                  <input type="text" value={editingListing.name || ''} onChange={(e) => setEditingListing({ ...editingListing, name: e.target.value })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" />
                 </div>
-
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.location}</label>
-                    <input 
-                      type="text"
-                      value={editingListing.location || ''}
-                      onChange={(e) => setEditingListing({ ...editingListing, location: e.target.value })}
-                      className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                    />
+                  <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.location}</label>
+                    <input type="text" value={editingListing.location || ''} onChange={(e) => setEditingListing({ ...editingListing, location: e.target.value })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.price}</label>
-                    <input 
-                      type="number"
-                      value={editingListing.price || 0}
-                      onChange={(e) => setEditingListing({ ...editingListing, price: parseFloat(e.target.value) })}
-                      className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                    />
+                  <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.price}</label>
+                    <input type="number" value={editingListing.price || 0} onChange={(e) => setEditingListing({ ...editingListing, price: parseFloat(e.target.value) })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" />
                   </div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.stars}</label>
-                    <input 
-                      type="number"
-                      min="1"
-                      max="5"
-                      value={editingListing.stars || 5}
-                      onChange={(e) => setEditingListing({ ...editingListing, stars: parseInt(e.target.value) })}
-                      className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                    />
+                  <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.stars}</label>
+                    <input type="number" min="1" max="5" value={editingListing.stars || 5} onChange={(e) => setEditingListing({ ...editingListing, stars: parseInt(e.target.value) })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.priceRange}</label>
-                    <select 
-                      value={editingListing.price_level}
-                      onChange={(e) => setEditingListing({ ...editingListing, price_level: e.target.value })}
-                      className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
+                  <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.priceRange}</label>
+                    <select value={editingListing.price_level} onChange={(e) => setEditingListing({ ...editingListing, price_level: e.target.value })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink">
+                      <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
                     </select>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.image}</label>
-                  <input 
-                    type="text"
-                    value={editingListing.image || ''}
-                    onChange={(e) => setEditingListing({ ...editingListing, image: e.target.value })}
-                    className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
-                  />
+                <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.image}</label>
+                  <input type="text" value={editingListing.image || ''} onChange={(e) => setEditingListing({ ...editingListing, image: e.target.value })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" />
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.description}</label>
-                  <textarea 
-                    value={editingListing.description || ''}
-                    onChange={(e) => setEditingListing({ ...editingListing, description: e.target.value })}
-                    className="w-full bg-paper/50 border-none rounded-2xl px-6 py-8 outline-none focus:ring-1 focus:ring-gold text-ink min-h-[120px]"
-                  />
+                <div className="space-y-2"><label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">{t.description}</label>
+                  <textarea value={editingListing.description || ''} onChange={(e) => setEditingListing({ ...editingListing, description: e.target.value })} className="w-full bg-paper/50 border-none rounded-2xl px-6 py-8 outline-none focus:ring-1 focus:ring-gold text-ink min-h-[120px]" />
                 </div>
               </div>
-
               <div className="p-8 border-t border-border bg-paper/30 flex gap-4">
-                <button 
-                  onClick={() => setEditingListing(null)}
-                  className="flex-1 btn-outline py-4"
-                >
-                  {t.cancel}
-                </button>
-                <button 
-                  onClick={handleSave}
-                  className="flex-1 btn-luxury py-4 flex items-center justify-center gap-2"
-                >
-                  <Save size={18} /> {t.save}
-                </button>
+                <button onClick={() => setEditingListing(null)} className="flex-1 btn-outline py-4">{t.cancel}</button>
+                <button onClick={handleSaveListing} className="flex-1 btn-luxury py-4 flex items-center justify-center gap-2"><Save size={18} /> {t.save}</button>
               </div>
             </motion.div>
           </motion.div>
