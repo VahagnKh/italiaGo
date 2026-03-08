@@ -105,11 +105,35 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
   const [userFilter, setUserFilter] = useState('all');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const [reconnectKey, setReconnectKey] = useState(0);
+
   useEffect(() => {
     fetchAllData();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    
+    // Setup WebSocket for real-time updates
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${protocol}//${window.location.host}`);
+    
+    socket.onopen = () => {
+      socket.send(JSON.stringify({ type: 'auth', role: 'admin' }));
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'notification') {
+        setNotifications(prev => [data.notification, ...prev].slice(0, 50));
+      } else if (data.type === 'admin_chat') {
+        setAdminMessages(prev => [...prev, data.message].slice(-50));
+      }
+    };
+
+    socket.onclose = () => {
+      console.log('Admin WebSocket disconnected');
+      setTimeout(() => setReconnectKey(prev => prev + 1), 5000);
+    };
+
+    return () => socket.close();
+  }, [reconnectKey]);
 
   useEffect(() => {
     if (activeMenu === 'chat') {
@@ -138,15 +162,23 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchListings = async () => {
     try {
-      const res = await fetch('/api/listings');
-      const data = await res.json();
-      setListings(Array.isArray(data) ? data : []);
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/listings', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setListings(Array.isArray(data) ? data : []);
+      }
     } catch (e) { console.error(e); }
   };
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch('/api/admin/users');
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/users', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
@@ -156,7 +188,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchAllBookings = async () => {
     try {
-      const res = await fetch('/api/admin/bookings');
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/bookings', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setAllBookings(Array.isArray(data) ? data : []);
@@ -166,7 +201,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchActivityLogs = async () => {
     try {
-      const res = await fetch('/api/admin/logs/activity');
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/logs/activity', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(Array.isArray(data) ? data : []);
@@ -176,7 +214,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchAdminLogs = async () => {
     try {
-      const res = await fetch('/api/admin/logs/admin');
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/logs/admin', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setAdminLogs(Array.isArray(data) ? data : []);
@@ -186,7 +227,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('/api/admin/notifications');
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/notifications', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setNotifications(Array.isArray(data) ? data : []);
@@ -196,7 +240,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch('/api/admin/analytics/activity');
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/analytics/activity', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setAnalyticsData(Array.isArray(data) ? data : []);
@@ -206,7 +253,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch('/api/admin/messages');
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/admin/messages', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setAdminMessages(Array.isArray(data) ? data : []);
@@ -218,23 +268,30 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     if (!newMessage.trim()) return;
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/admin/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ message: newMessage })
       });
       if (res.ok) {
         setNewMessage('');
-        fetchMessages();
       }
     } catch (e) { console.error(e); }
   };
 
   const handleUpdateRole = async (userId: number, role: string) => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`/api/admin/users/${userId}/role`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ role })
       });
       if (res.ok) fetchUsers();
@@ -243,9 +300,13 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const handleToggleUserStatus = async (userId: number, currentDisabled: boolean) => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`/api/admin/users/${userId}/status`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ disabled: !currentDisabled })
       });
       if (res.ok) fetchUsers();
@@ -261,9 +322,13 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
   const handleSaveListing = async () => {
     if (!editingListing) return;
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/admin/listings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(editingListing)
       });
       if (res.ok) {
@@ -276,7 +341,11 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
   const handleDeleteListing = async (id: string) => {
     if (!confirm('Are you sure you want to delete this listing?')) return;
     try {
-      const res = await fetch(`/api/admin/listings/${id}`, { method: 'DELETE' });
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/admin/listings/${id}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) fetchListings();
     } catch (e) { console.error(e); }
   };
@@ -318,14 +387,16 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
   ];
 
   const stats = [
-    { label: 'New Orders', value: allBookings.length, color: 'bg-blue-500', icon: ShoppingBag, trend: '+12%', trendUp: true },
-    { label: 'Bounce Rate', value: '53%', color: 'bg-emerald-500', icon: BarChart3, trend: '-2%', trendUp: false },
-    { label: 'User Registrations', value: users.length, color: 'bg-amber-500', icon: UserPlus, trend: '+5%', trendUp: true },
-    { label: 'Unique Visitors', value: '65', color: 'bg-rose-500', icon: Eye, trend: '+18%', trendUp: true },
+    { label: 'Total Bookings', value: allBookings.length, color: 'bg-blue-500', icon: ShoppingBag, trend: '+12%', trendUp: true },
+    { label: 'Active Users', value: users.filter(u => !u.disabled).length, color: 'bg-emerald-500', icon: BarChart3, trend: '+2%', trendUp: true },
+    { label: 'Total Users', value: users.length, color: 'bg-amber-500', icon: UserPlus, trend: '+5%', trendUp: true },
+    { label: 'Security Alerts', value: notifications.filter(n => n.type === 'security').length, color: 'bg-rose-500', icon: AlertTriangle, trend: '-18%', trendUp: false },
   ];
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const name = u.name || '';
+    const email = u.email || '';
+    const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) || email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = userFilter === 'all' || u.role === userFilter || (userFilter === 'disabled' && u.disabled);
     return matchesSearch && matchesFilter;
   });
@@ -396,12 +467,22 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d]"><Menu size={20} /></button>
             <nav className="hidden md:flex items-center gap-4 text-sm text-[#6c757d]">
-              <button className="hover:text-ink">Home</button>
+              <button onClick={onClose} className="hover:text-ink">Back to Site</button>
               <button className="hover:text-ink">Contact</button>
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d]"><Search size={18} /></button>
+            <div className="relative hidden sm:block">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6c757d]" size={14} />
+              <input 
+                type="text" 
+                placeholder="Search..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-4 py-1.5 bg-[#f4f6f9] border-none rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-500 w-48 lg:w-64"
+              />
+            </div>
+            <button className="sm:hidden p-2 hover:bg-paper rounded transition-colors text-[#6c757d]"><Search size={18} /></button>
             <div className="relative group">
               <button className="p-2 hover:bg-paper rounded transition-colors text-[#6c757d] relative">
                 <Bell size={18} />
@@ -414,7 +495,13 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
               <div className="absolute right-0 mt-2 w-80 bg-white border border-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
                 <div className="p-3 border-b border-border font-bold text-sm flex justify-between items-center">
                   Notifications
-                  <button onClick={() => fetch('/api/admin/notifications/read', { method: 'POST' }).then(fetchNotifications)} className="text-xs text-blue-500 hover:underline">Mark all as read</button>
+                  <button onClick={() => {
+                    const token = localStorage.getItem('token');
+                    fetch('/api/admin/notifications/read', { 
+                      method: 'POST',
+                      headers: { 'Authorization': `Bearer ${token}` }
+                    }).then(fetchNotifications);
+                  }} className="text-xs text-blue-500 hover:underline">Mark all as read</button>
                 </div>
                 <div className="max-h-64 overflow-y-auto">
                   {notifications.map(n => (
@@ -447,7 +534,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                activeMenu === 'security' ? 'Security Monitoring' : 'Admin Panel'}
             </h1>
             <div className="flex items-center gap-2 text-sm">
-              <button className="text-blue-500 hover:underline">Home</button>
+              <button onClick={onClose} className="text-blue-500 hover:underline">Back to Site</button>
               <span className="text-[#6c757d]">/</span>
               <span className="text-[#6c757d] capitalize">{activeMenu.replace('-', ' ')}</span>
             </div>
@@ -458,8 +545,8 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
             <div className="space-y-6">
               {/* Stats Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                {stats.map((stat, i) => (
-                  <div key={i} className={`${stat.color} text-white rounded shadow-sm overflow-hidden relative group`}>
+                {stats.map((stat) => (
+                  <div key={stat.label} className={`${stat.color} text-white rounded shadow-sm overflow-hidden relative group`}>
                     <div className="p-4 md:p-5 flex justify-between">
                       <div className="space-y-1">
                         <h3 className="text-3xl font-bold">{stat.value}</h3>
@@ -837,7 +924,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {adminMessages.map((msg, i) => (
+                {adminMessages.map((msg) => (
                   <div key={msg.id} className={`flex gap-3 ${msg.sender_id === 1 ? 'flex-row-reverse' : ''}`}>
                     <div className="w-10 h-10 rounded-full bg-paper overflow-hidden shrink-0 border border-border shadow-sm">
                       <img src={msg.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.sender_name}`} alt={msg.sender_name} />
@@ -935,7 +1022,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {listings.map((listing) => (
+                  {listings.filter(l => 
+                    l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    l.location.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((listing) => (
                     <motion.div key={listing.id} layout className="bg-white rounded border border-border overflow-hidden shadow-sm group">
                       <div className="relative h-48">
                         <img src={listing.image || undefined} alt={listing.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />

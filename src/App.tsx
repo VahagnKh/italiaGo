@@ -92,6 +92,27 @@ const DESTINATIONS = [
     tagline: 'Cradle of Renaissance',
     image: 'https://picsum.photos/seed/florence/800/600',
     description: 'An open-air museum of art and architectural wonders.'
+  },
+  {
+    id: 'venice',
+    name: 'Venice',
+    tagline: 'The Floating City',
+    image: 'https://picsum.photos/seed/venice/800/600',
+    description: 'A magical city of canals, bridges, and timeless romance.'
+  },
+  {
+    id: 'amalfi',
+    name: 'Amalfi',
+    tagline: 'Coastal Paradise',
+    image: 'https://picsum.photos/seed/amalfi/800/600',
+    description: 'Dramatic cliffs and turquoise waters of the Mediterranean.'
+  },
+  {
+    id: 'lake-como',
+    name: 'Lake Como',
+    tagline: 'Alpine Elegance',
+    image: 'https://picsum.photos/seed/como/800/600',
+    description: 'Serene waters surrounded by majestic mountains and luxury villas.'
   }
 ];
 
@@ -121,7 +142,7 @@ const STORIES = [
 
 export default function App() {
   const { language: lang, setLanguage: setLang, t } = useLanguage();
-  const [view, setView] = useState<'home' | 'checkout' | 'hotels' | 'restaurants' | 'tours' | 'taxi' | 'experiences' | 'rentals' | 'events' | 'overview' | 'inbox' | 'lessons' | 'tasks' | 'groups' | 'friends' | 'settings'>('home');
+  const [view, setView] = useState<'home' | 'checkout' | 'hotels' | 'restaurants' | 'tours' | 'taxi' | 'experiences' | 'rentals' | 'events' | 'overview' | 'inbox' | 'lessons' | 'tasks' | 'groups' | 'friends' | 'settings' | 'discover'>('home');
   const [initialFilter, setInitialFilter] = useState('all');
   const [initialPriceFilter, setInitialPriceFilter] = useState('all');
   const [initialSearch, setInitialSearch] = useState('');
@@ -142,9 +163,104 @@ export default function App() {
   const [showAI, setShowAI] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showAdminNotifications, setShowAdminNotifications] = useState(false);
+  const [adminNotifications, setAdminNotifications] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<{ id: string, message: string, type: 'success' | 'info' | 'error' }[]>([]);
   const [infoModal, setInfoModal] = useState<{ title: string, content: string } | null>(null);
   const [listings, setListings] = useState<any[]>([]);
+  const [ws, setWs] = useState<WebSocket | null>(null);
+
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      fetch('/api/report-error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: event.message,
+          stack: event.error?.stack,
+          url: event.filename,
+          line: event.lineno,
+          col: event.colno
+        })
+      }).catch(() => {}); // Silently fail to avoid infinite loops
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      fetch('/api/report-error', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Unhandled Promise Rejection: ${event.reason}`,
+          stack: event.reason?.stack,
+          url: window.location.href
+        })
+      }).catch(() => {}); // Silently fail
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, []);
+
+  const [reconnectKey, setReconnectKey] = useState(0);
+
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${protocol}//${window.location.host}`);
+    
+    socket.onopen = () => {
+      console.log('WebSocket connected');
+      if (user?.role === 'admin') {
+        socket.send(JSON.stringify({ type: 'auth', role: 'admin' }));
+      }
+    };
+
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'notification') {
+        addNotification(data.notification.message, data.notification.type === 'security' ? 'error' : 'info');
+        if (user?.role === 'admin') {
+          setAdminNotifications(prev => [data.notification, ...prev].slice(0, 20));
+        }
+      }
+    };
+
+    socket.onclose = () => {
+      console.log('WebSocket disconnected');
+      // Reconnect after 5 seconds
+      setTimeout(() => setReconnectKey(prev => prev + 1), 5000);
+    };
+
+    setWs(socket);
+    return () => socket.close();
+  }, [user, reconnectKey]);
+
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      const token = localStorage.getItem('token');
+      fetch('/api/admin/notifications', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(res => res.ok ? res.json() : Promise.reject('Not OK'))
+        .then(data => setAdminNotifications(Array.isArray(data) ? data : []))
+        .catch(err => console.error('Failed to fetch admin notifications:', err));
+    }
+  }, [user]);
+
+  const markNotificationsAsRead = async () => {
+    if (user?.role !== 'admin') return;
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('/api/admin/notifications/read', { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setAdminNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
+    } catch (e) { console.error(e); }
+  };
 
   const addNotification = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -156,16 +272,20 @@ export default function App() {
 
   useEffect(() => {
     fetch('/api/listings')
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : Promise.reject('Not OK'))
       .then(data => setListings(Array.isArray(data) ? data : []))
-      .catch(err => console.error(err));
+      .catch(err => console.error('Failed to fetch listings:', err));
   }, []);
 
   useEffect(() => {
     if (user) {
+      const token = localStorage.getItem('token');
       fetch('/api/log-activity', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ action: 'PAGE_VISIT', page: view })
       }).catch(console.error);
     }
@@ -187,10 +307,19 @@ export default function App() {
   }, []);
 
   const refreshUser = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
     try {
-      const res = await fetch('/api/user');
-      const data = await res.json();
-      setUser(data);
+      const res = await fetch('/api/user', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+      } else {
+        localStorage.removeItem('token');
+        setUser(null);
+      }
     } catch (err) {
       console.error('Failed to refresh user:', err);
     }
@@ -279,6 +408,7 @@ export default function App() {
         </div>
         
         <div className="hidden lg:flex items-center gap-4 xl:gap-8 text-[10px] xl:text-xs font-bold uppercase tracking-widest text-ink/60">
+          <button onClick={() => { setView('discover'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'discover' ? 'text-ink' : ''}`}>Discover All</button>
           <button onClick={() => { setView('hotels'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'hotels' ? 'text-ink' : ''}`}>{t.hotels}</button>
           <button onClick={() => { setView('restaurants'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'restaurants' ? 'text-ink' : ''}`}>{t.restaurants}</button>
           <button onClick={() => { setView('experiences'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'experiences' ? 'text-ink' : ''}`}>{t.experiences}</button>
@@ -305,6 +435,7 @@ export default function App() {
               exit={{ opacity: 0, x: -100 }}
               className="fixed top-[73px] left-0 w-64 h-[calc(100vh-73px)] bg-card border-r border-border p-6 flex flex-col gap-6 z-50 lg:hidden"
             >
+              <button onClick={() => { setView('discover'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">Discover All</button>
               <button onClick={() => { setView('hotels'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.hotels}</button>
               <button onClick={() => { setView('restaurants'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.restaurants}</button>
               <button onClick={() => { setView('experiences'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.experiences}</button>
@@ -425,6 +556,68 @@ export default function App() {
             </AnimatePresence>
           </div>
 
+          {user?.role === 'admin' && (
+            <div className="relative">
+              <button 
+                onClick={() => {
+                  setShowAdminNotifications(!showAdminNotifications);
+                  if (!showAdminNotifications) markNotificationsAsRead();
+                }}
+                className="relative p-1.5 sm:p-2 rounded-full border border-border hover:bg-paper transition-colors text-ink"
+              >
+                <Bell size={16} className="sm:w-[18px] sm:h-[18px]" />
+                {adminNotifications.some(n => !n.read) && (
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-card rounded-full" />
+                )}
+              </button>
+              
+              <AnimatePresence>
+                {showAdminNotifications && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-80 bg-card rounded-2xl shadow-2xl border border-border overflow-hidden z-50"
+                  >
+                    <div className="p-4 border-b border-border flex justify-between items-center bg-paper/30">
+                      <h3 className="font-bold text-xs uppercase tracking-widest text-ink">Admin Alerts</h3>
+                      <button onClick={() => setShowAdminNotifications(false)} className="text-ink"><X size={14} /></button>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto p-2">
+                      {adminNotifications.length === 0 ? (
+                        <p className="text-center text-ink/40 py-8 italic text-xs">No recent alerts</p>
+                      ) : (
+                        adminNotifications.map((n) => (
+                          <div key={n.id} className={`p-3 rounded-xl transition-colors mb-1 ${n.read ? 'opacity-60' : 'bg-paper/50 border-l-4 border-gold'}`}>
+                            <div className="flex justify-between items-start gap-2">
+                              <span className={`text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                                n.type === 'security' ? 'bg-red-100 text-red-600' : 
+                                n.type === 'registration' ? 'bg-blue-100 text-blue-600' : 
+                                'bg-emerald-100 text-emerald-600'
+                              }`}>
+                                {n.type}
+                              </span>
+                              <span className="text-[9px] text-ink/40">{new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <p className="text-xs text-ink mt-1 leading-relaxed">{n.message}</p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <div className="p-3 border-t border-border bg-paper/30">
+                      <button 
+                        onClick={() => { setShowAdmin(true); setShowAdminNotifications(false); }}
+                        className="w-full py-2 text-[10px] font-bold uppercase tracking-widest text-ink/60 hover:text-ink transition-colors"
+                      >
+                        View All in Admin Panel
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
           <div className="relative">
             {user ? (
             <div className="flex items-center gap-1.5 sm:gap-4">
@@ -491,6 +684,7 @@ export default function App() {
 
       <main className="flex-1 pt-20">
         {view === 'home' && <HomeView setView={setView} t={t} lang={lang} setInfoModal={setInfoModal} setInitialFilter={setInitialFilter} addNotification={addNotification} />}
+        {view === 'discover' && <ListView items={listings} type="all" title="Discover All" t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
         {view === 'checkout' && <CheckoutView setView={setView} basket={basket} basketTotal={basketTotal} onPaymentSuccess={() => { setBasket([]); refreshUser(); }} user={user} />}
         {view === 'hotels' && <ListView items={HOTELS} type="hotel" title={t.hotels} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
         {view === 'restaurants' && <ListView items={RESTAURANTS} type="restaurant" title={t.restaurants} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
@@ -643,8 +837,9 @@ export default function App() {
         {showAuthModal && (
           <AuthModal 
             onClose={() => setShowAuthModal(false)} 
-            onSuccess={(userData) => {
-              setUser(userData);
+            onSuccess={(data) => {
+              localStorage.setItem('token', data.token);
+              setUser(data.user);
               setShowAuthModal(false);
             }}
           />
@@ -753,13 +948,13 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotific
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {DESTINATIONS.map((dest, i) => (
+          {DESTINATIONS.map((dest) => (
             <motion.div 
-              key={i}
+              key={dest.id}
               whileHover={{ scale: 1.02 }}
               onClick={() => {
                 setInitialFilter(dest.name);
-                setView('hotels');
+                setView('discover');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="group relative h-[500px] rounded-3xl overflow-hidden shadow-lg cursor-pointer"
@@ -1091,9 +1286,13 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
     e.preventDefault();
     setIsUpdatingProfile(true);
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/user/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ name: profileName, avatar_url: profileAvatar }),
       });
       if (res.ok) {
@@ -1108,11 +1307,13 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
   };
 
   useEffect(() => {
-    fetch('/api/bookings')
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('/api/bookings', { headers: { 'Authorization': `Bearer ${token}` } })
       .then(res => res.json())
       .then(data => setBookings(Array.isArray(data) ? data : []));
     
-    fetch('/api/offers')
+    fetch('/api/offers', { headers: { 'Authorization': `Bearer ${token}` } })
       .then(res => res.json())
       .then(data => setOffers(Array.isArray(data) ? data : []));
   }, []);
@@ -1133,9 +1334,13 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
 
     setIsRedeeming(offer.id);
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/redeem', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ offerId: offer.id, points: Number(offer.discountPoints) })
       });
       const data = await res.json();
@@ -1248,8 +1453,8 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {bookings.map((booking, i) => (
-                        <tr key={i} className="hover:bg-paper/30 transition-colors">
+                      {bookings.map((booking) => (
+                        <tr key={booking.id} className="hover:bg-paper/30 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 bg-paper rounded-lg flex items-center justify-center text-ink">
@@ -1294,8 +1499,8 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
             <>
               <h2 className="text-2xl font-display italic text-ink">Your Favorites</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                {favorites.map((item, i) => (
-                  <div key={i} className="luxury-card group">
+                {favorites.map((item) => (
+                  <div key={item.id} className="luxury-card group">
                     <div className="h-48 overflow-hidden relative">
                       <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                       <button 
@@ -1382,7 +1587,11 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
               t={t} 
               addNotification={addNotification}
               onWin={() => {
-                fetch('/api/game-win', { method: 'POST' }).then(() => refreshUser());
+                const token = localStorage.getItem('token');
+                fetch('/api/game-win', { 
+                  method: 'POST',
+                  headers: { 'Authorization': `Bearer ${token}` }
+                }).then(() => refreshUser());
               }} 
             />
           )}
@@ -1408,9 +1617,9 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
                     <div className="flex-1 space-y-4">
                       <h4 className="text-xs font-bold uppercase tracking-widest text-ink/40">Choose an Avatar</h4>
                       <div className="flex flex-wrap gap-3">
-                        {avatars.map((av, i) => (
+                        {avatars.map((av) => (
                           <button 
-                            key={i}
+                            key={av}
                             type="button"
                             onClick={() => setProfileAvatar(av)}
                             className={`w-12 h-12 rounded-full overflow-hidden border-2 transition-all hover:scale-110 ${profileAvatar === av ? 'border-gold shadow-lg scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
@@ -1549,7 +1758,11 @@ function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string,
   const [friends, setFriends] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/friends')
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('/api/friends', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setFriends(Array.isArray(data) ? data : []))
       .catch(console.error);
@@ -1586,8 +1799,8 @@ function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string,
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 px-4">Friends</p>
           <div className="space-y-4 px-4">
-            {friends.map((friend, i) => (
-              <div key={i} className="flex items-center gap-3">
+            {friends.map((friend) => (
+              <div key={friend.id} className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100">
                   <img src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`} alt={friend.name} className="w-full h-full object-cover" />
                 </div>
@@ -1642,7 +1855,10 @@ function TopBar({ setView, user }: { setView: (v: any) => void, user: any }) {
 
   useEffect(() => {
     if (query.length > 2) {
-      fetch(`/api/search?q=${query}`)
+      const token = localStorage.getItem('token');
+      fetch(`/api/search?q=${query}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
         .then(res => res.json())
         .then(data => setResults(data));
     } else {
@@ -1728,13 +1944,22 @@ function DashboardHome({ user, setView }: { user: any, setView: (v: any) => void
   const [progress, setProgress] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/courses')
-      .then(res => res.json())
-      .then(data => setCourses(Array.isArray(data) ? data : []));
+    const token = localStorage.getItem('token');
+    if (!token) return;
     
-    fetch('/api/user/progress')
-      .then(res => res.json())
-      .then(data => setProgress(Array.isArray(data) ? data : []));
+    fetch('/api/courses', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject('Not OK'))
+      .then(data => setCourses(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Failed to fetch courses:', err));
+    
+    fetch('/api/user/progress', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : Promise.reject('Not OK'))
+      .then(data => setProgress(Array.isArray(data) ? data : []))
+      .catch(err => console.error('Failed to fetch progress:', err));
   }, []);
 
   return (
@@ -1790,8 +2015,8 @@ function DashboardHome({ user, setView }: { user: any, setView: (v: any) => void
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course, i) => (
-            <div key={i} className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 group hover:shadow-xl transition-all">
+          {courses.map((course) => (
+            <div key={course.id} className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 group hover:shadow-xl transition-all">
               <div className="h-48 relative overflow-hidden">
                 <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-[#7C3AED]">
@@ -1882,16 +2107,24 @@ function RightPanel({ user }: { user: any }) {
   ];
 
   useEffect(() => {
-    fetch('/api/mentors')
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('/api/mentors', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setMentors(Array.isArray(data) ? data : []))
       .catch(console.error);
   }, []);
 
   const handleFollow = (id: number) => {
+    const token = localStorage.getItem('token');
     fetch('/api/mentors/follow', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ mentorId: id })
     })
     .then(res => res.json())
@@ -1975,8 +2208,8 @@ function RightPanel({ user }: { user: any }) {
           </button>
         </div>
         <div className="space-y-4">
-          {mentors.map((mentor, i) => (
-            <div key={i} className="flex items-center justify-between">
+          {mentors.map((mentor) => (
+            <div key={mentor.id} className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100">
                   <img src={mentor.avatar} alt={mentor.name} className="w-full h-full object-cover" />
@@ -2010,7 +2243,11 @@ function InboxView({ user }: { user: any }) {
   const [content, setContent] = useState('');
 
   useEffect(() => {
-    fetch('/api/messages')
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('/api/messages', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setMessages(Array.isArray(data) ? data : []));
   }, []);
@@ -2018,14 +2255,20 @@ function InboxView({ user }: { user: any }) {
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
+    const token = localStorage.getItem('token');
     fetch('/api/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ receiverId: 1, content }) // Simplified: send to admin/mentor 1
     })
     .then(() => {
       setContent('');
-      fetch('/api/messages').then(res => res.json()).then(data => setMessages(Array.isArray(data) ? data : []));
+      fetch('/api/messages', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(res => res.json()).then(data => setMessages(Array.isArray(data) ? data : []));
     });
   };
 
@@ -2038,8 +2281,8 @@ function InboxView({ user }: { user: any }) {
         </button>
       </div>
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {messages.map((m, i) => (
-          <div key={i} className={`flex gap-4 ${m.sender_id === user.id ? 'flex-row-reverse' : ''}`}>
+        {messages.map((m) => (
+          <div key={m.id} className={`flex gap-4 ${m.sender_id === user.id ? 'flex-row-reverse' : ''}`}>
             <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 shrink-0">
               <img src={m.sender_avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.sender_name}`} alt={m.sender_name} />
             </div>
@@ -2081,13 +2324,20 @@ function LessonsView({ user }: { user: any }) {
   const [selectedCourse, setSelectedCourse] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/courses')
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('/api/courses', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setCourses(Array.isArray(data) ? data : []));
   }, []);
 
   const fetchCourseDetails = (id: number) => {
-    fetch(`/api/courses/${id}`)
+    const token = localStorage.getItem('token');
+    fetch(`/api/courses/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setSelectedCourse(data));
   };
@@ -2191,7 +2441,11 @@ function TasksView({ user }: { user: any }) {
   const [tasks, setTasks] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/tasks')
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('/api/tasks', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setTasks(Array.isArray(data) ? data : []));
   }, []);
@@ -2206,8 +2460,8 @@ function TasksView({ user }: { user: any }) {
         </div>
       </div>
       <div className="grid grid-cols-1 gap-6">
-        {tasks.map((task, i) => (
-          <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 group hover:shadow-xl transition-all">
+        {tasks.map((task) => (
+          <div key={task.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 group hover:shadow-xl transition-all">
             <div className="flex items-center gap-6">
               <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-[#7C3AED] group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
                 <CheckSquare size={32} />
@@ -2285,7 +2539,11 @@ function FriendsView({ user }: { user: any }) {
   const [friends, setFriends] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/friends')
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    fetch('/api/friends', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setFriends(Array.isArray(data) ? data : []));
   }, []);
@@ -2294,8 +2552,8 @@ function FriendsView({ user }: { user: any }) {
     <div className="space-y-8">
       <h2 className="text-2xl font-bold text-gray-900">My Friends</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {friends.map((friend, i) => (
-          <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 text-center space-y-6 group hover:shadow-xl transition-all">
+        {friends.map((friend) => (
+          <div key={friend.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 text-center space-y-6 group hover:shadow-xl transition-all">
             <div className="relative inline-block">
               <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-50 shadow-lg">
                 <img src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`} alt={friend.name} className="w-full h-full object-cover" />
@@ -2335,9 +2593,13 @@ function SettingsView({ user, setUser }: { user: any, setUser: (u: any) => void 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    const token = localStorage.getItem('token');
     fetch('/api/user/profile', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ name, avatar_url: avatar })
     })
     .then(res => res.json())
@@ -2424,6 +2686,7 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
     // Distribute points across items (simplified: use all on first item or split)
     let remainingPoints = pointsToUse;
 
+    const token = localStorage.getItem('token');
     for (let i = 0; i < basket.length; i++) {
       const item = basket[i];
       const itemPoints = i === basket.length - 1 ? remainingPoints : Math.min(remainingPoints, Math.floor(item.price * 10));
@@ -2431,7 +2694,10 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
 
       const response = await fetch('/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           type: item.type || 'experience',
           itemName: item.name,
@@ -2642,17 +2908,20 @@ function CheckoutView({ setView, basket, basketTotal, onPaymentSuccess, user }: 
   );
 }
 
-function ReviewsSection({ itemId, t, lang, user }: { itemId: string, t: any, lang: string, user: any }) {
+function ReviewsSection({ itemId, type, t, lang, user }: { itemId: string, type: string, t: any, lang: string, user: any }) {
   const [reviews, setReviews] = useState<any[]>([]);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/reviews/${itemId}`)
+    const token = localStorage.getItem('token');
+    fetch(`/api/reviews/${itemId}?type=${type}`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setReviews(Array.isArray(data) ? data : []));
-  }, [itemId]);
+  }, [itemId, type]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2660,10 +2929,14 @@ function ReviewsSection({ itemId, t, lang, user }: { itemId: string, t: any, lan
 
     setIsSubmitting(true);
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch('/api/reviews', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId, rating, comment, userId: user?.id })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ itemId, type, rating, comment, userId: user?.id })
       });
       const newReview = await res.json();
       setReviews(prev => [newReview, ...prev]);
@@ -2849,54 +3122,70 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
         </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-        {filteredItems.map((item, i) => (
-          <motion.div 
-            key={i}
-            whileHover={{ y: -10 }}
-            className="luxury-card group cursor-pointer"
-          >
-            <div className="h-64 overflow-hidden relative">
-              <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-              <div className="absolute top-4 right-4">
-                <div className="bg-card/90 backdrop-blur px-3 py-1 rounded-full flex items-center gap-1">
-                  {Array.from({ length: item.stars }).map((_, j) => (
-                    <Star key={j} size={10} fill="currentColor" className="text-gold" />
-                  ))}
+        {filteredItems.length > 0 ? (
+          filteredItems.map((item) => (
+            <motion.div 
+              key={item.id}
+              whileHover={{ y: -10 }}
+              className="luxury-card group cursor-pointer"
+            >
+              <div className="h-64 overflow-hidden relative">
+                <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute top-4 right-4">
+                  <div className="bg-card/90 backdrop-blur px-3 py-1 rounded-full flex items-center gap-1">
+                    {Array.from({ length: item.stars }).map((_, j) => (
+                      <Star key={j} size={10} fill="currentColor" className="text-gold" />
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <button 
-                onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
-                className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10 ${
-                  favorites.some(f => f.id === item.id) 
-                    ? 'bg-red-500 text-white' 
-                    : 'bg-card/90 backdrop-blur text-ink/40 hover:text-red-500'
-                }`}
-              >
-                <Heart size={14} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 bg-card">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-xl font-display text-ink">{item.name}</h3>
-                  <p className="text-sm text-ink/60 flex items-center gap-1">
-                    <MapPin size={12} /> {item.location}
-                  </p>
-                </div>
-                {item.price && <span className="font-bold text-ink">€{item.price}</span>}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setSelectedItem(item)} className="flex-1 btn-outline text-xs py-2">{t.more}</button>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); onAddToBasket(item); }}
-                  className="flex-1 btn-luxury text-xs py-2"
+                  onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
+                  className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10 ${
+                    favorites.some(f => f.id === item.id) 
+                      ? 'bg-red-500 text-white' 
+                      : 'bg-card/90 backdrop-blur text-ink/40 hover:text-red-500'
+                  }`}
                 >
-                  {t.addToBasket}
+                  <Heart size={14} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
                 </button>
               </div>
+              <div className="p-6 space-y-4 bg-card">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-xl font-display text-ink">{item.name}</h3>
+                    <p className="text-sm text-ink/60 flex items-center gap-1">
+                      <MapPin size={12} /> {item.location}
+                    </p>
+                  </div>
+                  {item.price && <span className="font-bold text-ink">€{item.price}</span>}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setSelectedItem(item)} className="flex-1 btn-outline text-xs py-2">{t.more}</button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onAddToBasket(item); }}
+                    className="flex-1 btn-luxury text-xs py-2"
+                  >
+                    {t.addToBasket}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          ))
+        ) : (
+          <div className="col-span-full py-20 text-center space-y-4">
+            <div className="w-20 h-20 bg-paper rounded-full flex items-center justify-center mx-auto text-ink/20">
+              <Search size={40} />
             </div>
-          </motion.div>
-        ))}
+            <h3 className="text-2xl font-display italic text-ink">No results found</h3>
+            <p className="text-ink/60 max-w-md mx-auto">Try adjusting your filters or search terms to find what you're looking for.</p>
+            <button 
+              onClick={() => { setFilter('all'); setPriceFilter('all'); setStarFilter('all'); setSearch(''); }}
+              className="text-gold font-bold uppercase tracking-widest text-xs hover:underline"
+            >
+              Clear all filters
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-20">
@@ -2975,7 +3264,7 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
                   </div>
 
                   {(type === 'hotel' || type === 'restaurant') && (
-                    <ReviewsSection itemId={selectedItem.id} t={t} lang={lang} user={user} />
+                    <ReviewsSection itemId={selectedItem.id} type={selectedItem.type} t={t} lang={lang} user={user} />
                   )}
 
                   <div className="pt-6">
@@ -3001,7 +3290,10 @@ function Suggestions({ t }: { t: any }) {
   const [suggestions, setSuggestions] = useState<any[]>([]);
 
   useEffect(() => {
-    fetch('/api/suggestions')
+    const token = localStorage.getItem('token');
+    fetch('/api/suggestions', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
       .then(res => res.json())
       .then(data => setSuggestions(Array.isArray(data) ? data : []));
   }, []);
@@ -3165,9 +3457,13 @@ function TaxiView({ t, lang, user, refreshUser }: { t: any, lang: string, user: 
     const pointsToUse = usePoints ? Math.min(user?.bonus || 0, Math.floor((estimate.cost - minigameDiscount) * 10)) : 0;
     
     try {
+      const token = localStorage.getItem('token');
       await fetch('/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           type: 'taxi',
           itemName: `Ride to ${destination}`,

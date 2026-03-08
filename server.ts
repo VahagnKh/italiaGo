@@ -1,10 +1,19 @@
 import express from "express";
+import http from "http";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer, WebSocket } from "ws";
 import session from "express-session";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import helmet from "helmet";
+import cors from "cors";
+import Stripe from "stripe";
+
+const JWT_SECRET = process.env.JWT_SECRET || "italiago-jwt-secret-2026";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock");
 
 declare module "express-session" {
   interface SessionData {
@@ -34,7 +43,124 @@ db.exec(`
     role TEXT DEFAULT 'user',
     avatar_url TEXT,
     disabled INTEGER DEFAULT 0,
-    last_login DATETIME
+    last_login DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS tours (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    price REAL,
+    location TEXT,
+    image TEXT,
+    rating REAL DEFAULT 0,
+    reviews_count INTEGER DEFAULT 0,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS restaurants (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    price REAL,
+    location TEXT,
+    image TEXT,
+    rating REAL DEFAULT 0,
+    reviews_count INTEGER DEFAULT 0,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS hotels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    price REAL,
+    location TEXT,
+    image TEXT,
+    rating REAL DEFAULT 0,
+    reviews_count INTEGER DEFAULT 0,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS experiences (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    price REAL,
+    location TEXT,
+    image TEXT,
+    rating REAL DEFAULT 0,
+    reviews_count INTEGER DEFAULT 0,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS rentals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    price REAL,
+    location TEXT,
+    image TEXT,
+    rating REAL DEFAULT 0,
+    reviews_count INTEGER DEFAULT 0,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    price REAL,
+    location TEXT,
+    image TEXT,
+    rating REAL DEFAULT 0,
+    reviews_count INTEGER DEFAULT 0,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS taxi_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT,
+    description TEXT,
+    price REAL,
+    location TEXT,
+    image TEXT,
+    rating REAL DEFAULT 0,
+    reviews_count INTEGER DEFAULT 0,
+    details TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    listing_id INTEGER,
+    listing_type TEXT, -- 'tour', 'restaurant', 'hotel', 'taxi'
+    rating INTEGER,
+    comment TEXT,
+    username TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS bookings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    listing_id INTEGER,
+    listing_type TEXT,
+    date DATETIME,
+    guests INTEGER,
+    amount REAL,
+    status TEXT DEFAULT 'pending', -- 'pending', 'confirmed', 'cancelled'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 
   CREATE TABLE IF NOT EXISTS activity_logs (
@@ -48,36 +174,11 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
-  CREATE TABLE IF NOT EXISTS admin_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    admin_id INTEGER,
-    action TEXT,
-    target_id TEXT,
-    old_value TEXT,
-    new_value TEXT,
-    ip TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
   CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    type TEXT, -- 'security', 'registration', 'system', 'role_change'
+    type TEXT,
     message TEXT,
     read INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS admin_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sender_id INTEGER,
-    message TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS failed_logins (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT,
-    ip TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -85,10 +186,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT,
     description TEXT,
-    instructor TEXT,
     image TEXT,
-    category TEXT,
-    total_lessons INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -96,9 +194,9 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     course_id INTEGER,
     title TEXT,
-    video_url TEXT,
-    duration TEXT,
+    content TEXT,
     order_index INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(course_id) REFERENCES courses(id)
   );
 
@@ -107,47 +205,11 @@ db.exec(`
     user_id INTEGER,
     course_id INTEGER,
     lesson_id INTEGER,
-    status TEXT DEFAULT 'started', -- 'started', 'completed'
-    last_watched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    completed INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id),
     FOREIGN KEY(course_id) REFERENCES courses(id),
     FOREIGN KEY(lesson_id) REFERENCES lessons(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS mentors (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT,
-    role TEXT,
-    avatar TEXT,
-    bio TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS user_mentors (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    mentor_id INTEGER,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(mentor_id) REFERENCES mentors(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    course_id INTEGER,
-    title TEXT,
-    description TEXT,
-    due_date DATETIME,
-    FOREIGN KEY(course_id) REFERENCES courses(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS user_tasks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    task_id INTEGER,
-    status TEXT DEFAULT 'pending', -- 'pending', 'submitted', 'graded'
-    submission_url TEXT,
-    grade TEXT,
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(task_id) REFERENCES tasks(id)
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -158,69 +220,6 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(sender_id) REFERENCES users(id),
     FOREIGN KEY(receiver_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS friends (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    friend_id INTEGER,
-    status TEXT DEFAULT 'pending', -- 'pending', 'accepted'
-    FOREIGN KEY(user_id) REFERENCES users(id),
-    FOREIGN KEY(friend_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS listings (
-    id TEXT PRIMARY KEY,
-    type TEXT,
-    name TEXT,
-    location TEXT,
-    price REAL,
-    price_level TEXT,
-    image TEXT,
-    stars INTEGER,
-    description TEXT,
-    amenities TEXT,
-    history TEXT,
-    chef TEXT,
-    michelin_stars INTEGER,
-    specialty TEXT,
-    duration TEXT,
-    highlights TEXT,
-    info TEXT,
-    category TEXT
-  );
-
-  CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    type TEXT, -- 'hotel', 'restaurant', 'tour', 'taxi'
-    item_name TEXT,
-    details TEXT,
-    amount REAL,
-    status TEXT DEFAULT 'confirmed',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    booking_id INTEGER,
-    amount REAL,
-    method TEXT,
-    status TEXT,
-    transaction_id TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(booking_id) REFERENCES bookings(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS reviews (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    item_id TEXT,
-    rating INTEGER,
-    comment TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(user_id) REFERENCES users(id)
   );
 `);
 
@@ -250,6 +249,26 @@ try {
   if (!columnNames.includes('last_login')) {
     db.prepare("ALTER TABLE users ADD COLUMN last_login DATETIME").run();
   }
+
+  // Reviews migration
+  const reviewColumns = db.prepare("PRAGMA table_info(reviews)").all();
+  const reviewColumnNames = reviewColumns.map((col: any) => col.name);
+  if (!reviewColumnNames.includes('listing_id')) {
+    db.prepare("ALTER TABLE reviews ADD COLUMN listing_id INTEGER").run();
+  }
+  if (!reviewColumnNames.includes('listing_type')) {
+    db.prepare("ALTER TABLE reviews ADD COLUMN listing_type TEXT").run();
+  }
+
+  // Bookings migration
+  const bookingColumns = db.prepare("PRAGMA table_info(bookings)").all();
+  const bookingColumnNames = bookingColumns.map((col: any) => col.name);
+  if (!bookingColumnNames.includes('listing_id')) {
+    db.prepare("ALTER TABLE bookings ADD COLUMN listing_id INTEGER").run();
+  }
+  if (!bookingColumnNames.includes('listing_type')) {
+    db.prepare("ALTER TABLE bookings ADD COLUMN listing_type TEXT").run();
+  }
 } catch (error) {
   console.error("Migration Error:", error);
 }
@@ -258,33 +277,129 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
-  app.use(session({
-    secret: "italiago-secret-key-2026",
-    resave: false,
-    saveUninitialized: false,
-    cookie: { 
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "none",
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
-  }));
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server });
+  const games = new Map<string, { players: WebSocket[], board: (string|null)[], turn: number }>();
+  const adminClients = new Set<WebSocket>();
 
-  // Helper to get current user
-  const getCurrentUser = (req: express.Request) => {
-    if (!req.session.userId) return null;
-    return db.prepare("SELECT * FROM users WHERE id = ?").get(req.session.userId);
+  const notifyAdmins = (type: string, message: string, details?: any) => {
+    const notification = {
+      type,
+      message,
+      created_at: new Date().toISOString(),
+      read: 0
+    };
+    
+    try {
+      const result = db.prepare("INSERT INTO notifications (type, message) VALUES (?, ?)").run(type, message);
+      (notification as any).id = result.lastInsertRowid;
+      
+      const wsMessage = JSON.stringify({ type: 'notification', notification, details });
+      adminClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(wsMessage);
+        }
+      });
+    } catch (e) {
+      console.error("Failed to create notification:", e);
+    }
   };
 
-  // Middleware to attach user to request
-  app.use((req, res, next) => {
-    (req as any).user = getCurrentUser(req);
-    next();
+  wss.on('connection', (ws) => {
+    let roomId: string | null = null;
+    let isAdmin = false;
+
+    ws.on('message', (data) => {
+      try {
+        const message = JSON.parse(data.toString());
+        
+        if (message.type === 'auth') {
+          if (message.role === 'admin') {
+            isAdmin = true;
+            adminClients.add(ws);
+            ws.send(JSON.stringify({ type: 'auth_success', message: 'Connected as admin' }));
+          }
+        }
+
+        if (message.type === 'join') {
+          roomId = message.roomId;
+          if (!games.has(roomId!)) {
+            games.set(roomId!, { players: [ws], board: Array(9).fill(null), turn: 0 });
+            ws.send(JSON.stringify({ type: 'waiting' }));
+          } else {
+            const game = games.get(roomId!)!;
+            if (game.players.length < 2) {
+              game.players.push(ws);
+              game.players[0].send(JSON.stringify({ type: 'start', symbol: 'X', turn: true }));
+              game.players[1].send(JSON.stringify({ type: 'start', symbol: 'O', turn: false }));
+            } else {
+              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
+            }
+          }
+        }
+        if (message.type === 'move') {
+          const game = games.get(roomId!)!;
+          if (!game) return;
+          const playerIndex = game.players.indexOf(ws);
+          if (playerIndex === game.turn && game.board[message.index] === null) {
+            game.board[message.index] = playerIndex === 0 ? 'X' : 'O';
+            game.turn = 1 - game.turn;
+            game.players.forEach((p, idx) => {
+              p.send(JSON.stringify({ type: 'update', board: game.board, turn: idx === game.turn }));
+            });
+            const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for (const pattern of winPatterns) {
+              const [a, b, c] = pattern;
+              if (game.board[a] && game.board[a] === game.board[b] && game.board[a] === game.board[c]) {
+                game.players.forEach((p, idx) => p.send(JSON.stringify({ type: 'gameOver', winner: idx === playerIndex ? 'you' : 'opponent' })));
+                games.delete(roomId!);
+                return;
+              }
+            }
+            if (!game.board.includes(null)) {
+              game.players.forEach(p => p.send(JSON.stringify({ type: 'gameOver', winner: 'draw' })));
+              games.delete(roomId!);
+            }
+          }
+        }
+      } catch (e) { console.error(e); }
+    });
+    ws.on('close', () => {
+      if (isAdmin) {
+        adminClients.delete(ws);
+      }
+      if (roomId && games.has(roomId)) {
+        const game = games.get(roomId)!;
+        game.players.forEach(p => { if (p !== ws) p.send(JSON.stringify({ type: 'opponentLeft' })); });
+        games.delete(roomId);
+      }
+    });
   });
 
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(cors());
+  app.use(express.json());
+  
+  // Authentication Middleware
+  const authenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) return res.sendStatus(401);
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+      if (err) return res.sendStatus(403);
+      req.user = user;
+      next();
+    });
+  };
+
+  const isAdminMiddleware = (req: any, res: any, next: any) => {
+    if (req.user?.role !== 'admin') return res.status(403).json({ error: "Admin access required" });
+    next();
+  };
+
   // Activity Tracking Middleware
-  app.use((req, res, next) => {
-    const user = (req as any).user;
+  app.use((req: any, res, next) => {
+    const user = req.user;
     if (user && req.method !== 'GET' && !req.path.startsWith('/api/admin')) {
       try {
         db.prepare(`
@@ -305,158 +420,267 @@ async function startServer() {
     next();
   });
 
-  // Seed user if not exists
-  const seedUser = db.prepare("SELECT * FROM users WHERE email = ?").get("demo@italiago.com");
-  if (!seedUser) {
-    db.prepare("INSERT INTO users (email, password, name, wallet_balance, bonus, has_purchased, role) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-      "demo@italiago.com",
-      "password123",
-      "Marco Rossi",
-      0.0,
-      0,
-      0,
-      "admin"
-    );
-  } else {
-    // Ensure demo user is admin if they already exist
-    db.prepare("UPDATE users SET role = 'admin' WHERE email = ?").run("demo@italiago.com");
-  }
+  // Seed Data
+  const seedData = async () => {
+    // Admin
+    const admin = db.prepare("SELECT * FROM users WHERE email = ?").get("admin@italiago.com");
+    if (!admin) {
+      const hashedPassword = await bcrypt.hash("admin123", 10);
+      db.prepare("INSERT INTO users (email, password, name, role) VALUES (?, ?, ?, ?)").run("admin@italiago.com", hashedPassword, "Super Admin", "admin");
+    }
 
-  // Seed listings if empty
-  const listingCount = db.prepare("SELECT COUNT(*) as count FROM listings").get().count;
-  if (listingCount === 0) {
-    const initialListings = [
-      { id: 'h1', type: 'hotel', name: 'Hotel Danieli', location: 'Venice', price: 850, price_level: 'high', image: 'https://picsum.photos/seed/danieli/800/600', stars: 5, description: 'A legendary hotel in the heart of Venice...', amenities: JSON.stringify(['Spa', 'Fine Dining', 'Private Dock']), history: 'Built in the 14th century...', category: 'Premium' },
-      { id: 'h2', type: 'hotel', name: 'Grand Hotel Tremezzo', location: 'Lake Como', price: 1200, price_level: 'high', image: 'https://picsum.photos/seed/tremezzo/800/600', stars: 5, description: 'Art Nouveau palace with floating pool...', category: 'Premium' },
-      { id: 'r1', type: 'restaurant', name: 'Osteria Francescana', location: 'Modena', price: 300, price_level: 'high', image: 'https://picsum.photos/seed/osteria/800/600', stars: 5, chef: 'Massimo Bottura', michelin_stars: 3, specialty: 'Oops! I Dropped the Lemon Tart', category: 'Premium' },
-      { id: 'r2', type: 'restaurant', name: 'La Pergola', location: 'Rome', price: 250, price_level: 'high', image: 'https://picsum.photos/seed/pergola/800/600', stars: 5, chef: 'Heinz Beck', michelin_stars: 3, specialty: 'Fagottelli La Pergola', category: 'Premium' },
-      { id: 't1', type: 'tour', name: 'Vatican Museums Private Tour', location: 'Rome', duration: '4h', price: 250, price_level: 'medium', image: 'https://picsum.photos/seed/vatican/800/600', stars: 5, description: 'Skip the lines...', highlights: JSON.stringify(['Sistine Chapel', 'Raphael Rooms']), category: 'Standard' },
-      { id: 'e1', type: 'experience', name: 'Tuscan Culinary Journey', location: 'Florence', price: 180, price_level: 'medium', image: 'https://picsum.photos/seed/culinary/800/600', stars: 5, description: 'Authentic cooking class in a Medici villa.', category: 'Culinary' },
-      { id: 'e2', type: 'experience', name: 'Truffle Hunting & Tasting', location: 'Alba', price: 220, price_level: 'high', image: 'https://picsum.photos/seed/truffle/800/600', stars: 5, description: 'Follow the expert dogs and enjoy a truffle feast.', category: 'Culinary' },
-    ];
-    const insertListing = db.prepare(`
-      INSERT INTO listings (id, type, name, location, price, price_level, image, stars, description, amenities, history, chef, michelin_stars, specialty, duration, highlights, info, category)
-      VALUES (@id, @type, @name, @location, @price, @price_level, @image, @stars, @description, @amenities, @history, @chef, @michelin_stars, @specialty, @duration, @highlights, @info, @category)
-    `);
-    initialListings.forEach((l: any) => {
-      const data = {
-        id: l.id, type: l.type, name: l.name, location: l.location, price: l.price, price_level: l.price_level,
-        image: l.image, stars: l.stars, description: l.description || null, amenities: l.amenities || null,
-        history: l.history || null, chef: l.chef || null, michelin_stars: l.michelin_stars || null,
-        specialty: l.specialty || null, duration: l.duration || null, highlights: l.highlights || null,
-        info: l.info || null, category: l.category || 'Standard'
-      };
-      insertListing.run(data);
-    });
-    console.log("Seeded initial listings.");
-  }
+    // Tours
+    const tourCount = db.prepare("SELECT COUNT(*) as count FROM tours").get().count;
+    if (tourCount === 0) {
+      const tours = [
+        { title: 'Colosseum Private Tour', description: 'Skip-the-line access to the heart of Rome.', price: 150, location: 'Rome', image: 'https://picsum.photos/seed/rome/800/600', details: 'Includes access to the arena floor and underground chambers.' },
+        { title: 'Venice Gondola Ride', description: 'Romantic sunset ride through the canals.', price: 120, location: 'Venice', image: 'https://picsum.photos/seed/venice/800/600', details: 'Private gondola for up to 4 people.' },
+        { title: 'Tuscan Wine Tasting', description: 'Explore the vineyards of Chianti.', price: 200, location: 'Florence', image: 'https://picsum.photos/seed/tuscany/800/600', details: 'Visit 3 historic wineries with lunch included.' }
+      ];
+      const insert = db.prepare("INSERT INTO tours (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
+      tours.forEach(t => insert.run(t.title, t.description, t.price, t.location, t.image, t.details));
+    }
 
-  // Seed Learning Platform Data
-  const courseCount = db.prepare("SELECT COUNT(*) as count FROM courses").get().count;
-  if (courseCount === 0) {
-    const insertCourse = db.prepare(`
-      INSERT INTO courses (title, description, instructor, image, category, total_lessons)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    const insertLesson = db.prepare(`
-      INSERT INTO lessons (course_id, title, video_url, duration, order_index)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    const insertMentor = db.prepare(`
-      INSERT INTO mentors (name, role, avatar, bio)
-      VALUES (?, ?, ?, ?)
-    `);
+    // Restaurants
+    const restCount = db.prepare("SELECT COUNT(*) as count FROM restaurants").get().count;
+    if (restCount === 0) {
+      const rests = [
+        { title: 'Osteria Francescana', description: 'World-renowned fine dining.', price: 350, location: 'Modena', image: 'https://picsum.photos/seed/osteria/800/600', details: '3 Michelin stars. Booking required 6 months in advance.' },
+        { title: 'La Pergola', description: 'Panoramic views of Rome.', price: 250, location: 'Rome', image: 'https://picsum.photos/seed/pergola/800/600', details: 'The only 3-star Michelin restaurant in Rome.' }
+      ];
+      const insert = db.prepare("INSERT INTO restaurants (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
+      rests.forEach(r => insert.run(r.title, r.description, r.price, r.location, r.image, r.details));
+    }
 
-    const courses = [
-      { title: "Beginner's Guide To Becoming A Professional Frontend Developer", description: "Learn React, Tailwind, and more.", instructor: "Prashant Kumar Singh", image: "https://picsum.photos/seed/frontend/800/600", category: "FRONTEND", total_lessons: 8 },
-      { title: "Understanding Concept Of React", description: "Deep dive into hooks and state.", instructor: "Ravi Kumar", image: "https://picsum.photos/seed/react/800/600", category: "FRONTEND", total_lessons: 5 },
-      { title: "Product Design Masterclass", description: "UI/UX principles for modern apps.", instructor: "Sarah Jenkins", image: "https://picsum.photos/seed/design/800/600", category: "DESIGN", total_lessons: 10 }
-    ];
+    // Hotels
+    const hotelCount = db.prepare("SELECT COUNT(*) as count FROM hotels").get().count;
+    if (hotelCount === 0) {
+      const hotels = [
+        { title: 'Hotel Danieli', description: 'Historic luxury on the Grand Canal.', price: 800, location: 'Venice', image: 'https://picsum.photos/seed/danieli/800/600', details: 'A legendary hotel housed in a 14th-century palace.' },
+        { title: 'Hotel Hassler', description: 'Top of the Spanish Steps.', price: 900, location: 'Rome', image: 'https://picsum.photos/seed/hassler/800/600', details: 'Iconic luxury with the best views of the Eternal City.' }
+      ];
+      const insert = db.prepare("INSERT INTO hotels (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
+      hotels.forEach(h => insert.run(h.title, h.description, h.price, h.location, h.image, h.details));
+    }
 
-    courses.forEach(c => {
-      const result = insertCourse.run(c.title, c.description, c.instructor, c.image, c.category, c.total_lessons);
-      const courseId = result.lastInsertRowid;
-      for (let i = 1; i <= c.total_lessons; i++) {
-        insertLesson.run(courseId, `Lesson ${i}: Introduction to ${c.category}`, "https://www.youtube.com/embed/dQw4w9WgXcQ", "10:00", i);
-      }
-    });
+    // Taxi
+    const taxiCount = db.prepare("SELECT COUNT(*) as count FROM taxi_services").get().count;
+    if (taxiCount === 0) {
+      const taxis = [
+        { title: 'Rome Elite Transfers', description: 'Luxury Mercedes S-Class.', price: 80, location: 'Rome', image: 'https://picsum.photos/seed/taxi1/800/600', details: 'Professional chauffeurs for airport transfers.' },
+        { title: 'Milan Fashion Limo', description: 'Sleek black limousine.', price: 150, location: 'Milan', image: 'https://picsum.photos/seed/taxi2/800/600', details: 'The most stylish way to arrive at Milan Fashion Week.' }
+      ];
+      const insert = db.prepare("INSERT INTO taxi_services (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
+      taxis.forEach(t => insert.run(t.title, t.description, t.price, t.location, t.image, t.details));
+    }
 
-    const mentors = [
-      { name: "Prashant Kumar Singh", role: "Software Developer", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Prashant", bio: "Expert in React and Node.js" },
-      { name: "Sarah Jenkins", role: "Product Designer", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah", bio: "Lead Designer at TechCorp" },
-      { name: "Ravi Kumar", role: "Fullstack Engineer", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ravi", bio: "Open source contributor" }
-    ];
+    // Experiences
+    const expCount = db.prepare("SELECT COUNT(*) as count FROM experiences").get().count;
+    if (expCount === 0) {
+      const exps = [
+        { title: 'Cooking Class in Trastevere', description: 'Learn to make pasta from scratch.', price: 85, location: 'Rome', image: 'https://picsum.photos/seed/cooking/800/600', details: '3-hour workshop with a local chef.' },
+        { title: 'Hot Air Balloon over Tuscany', description: 'Breathtaking views of the rolling hills.', price: 250, location: 'Siena', image: 'https://picsum.photos/seed/balloon/800/600', details: 'Includes champagne breakfast upon landing.' }
+      ];
+      const insert = db.prepare("INSERT INTO experiences (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
+      exps.forEach(e => insert.run(e.title, e.description, e.price, e.location, e.image, e.details));
+    }
 
-    mentors.forEach(m => insertMentor.run(m.name, m.role, m.avatar, m.bio));
+    // Rentals
+    const rentCount = db.prepare("SELECT COUNT(*) as count FROM rentals").get().count;
+    if (rentCount === 0) {
+      const rents = [
+        { title: 'Vintage Vespa Rental', description: 'Explore Rome like a local.', price: 60, location: 'Rome', image: 'https://picsum.photos/seed/vespa/800/600', details: 'Includes helmets and insurance.' },
+        { title: 'Luxury Yacht Charter', description: 'Sail the Amalfi Coast.', price: 1200, location: 'Positano', image: 'https://picsum.photos/seed/yacht/800/600', details: 'Full day charter with crew and snacks.' }
+      ];
+      const insert = db.prepare("INSERT INTO rentals (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
+      rents.forEach(r => insert.run(r.title, r.description, r.price, r.location, r.image, r.details));
+    }
 
-    console.log("Seeded learning platform data.");
-  }
+    // Events
+    const eventCount = db.prepare("SELECT COUNT(*) as count FROM events").get().count;
+    if (eventCount === 0) {
+      const evs = [
+        { title: 'Opera at Verona Arena', description: 'A magical night under the stars.', price: 180, location: 'Verona', image: 'https://picsum.photos/seed/opera/800/600', details: 'Premium seats for Aida.' },
+        { title: 'Milan Fashion Week Pass', description: 'Exclusive access to top shows.', price: 500, location: 'Milan', image: 'https://picsum.photos/seed/fashion/800/600', details: 'VIP entry to 3 major shows.' }
+      ];
+      const insert = db.prepare("INSERT INTO events (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
+      evs.forEach(e => insert.run(e.title, e.description, e.price, e.location, e.image, e.details));
+    }
+
+    // Demo Reviews
+    const reviewCount = db.prepare("SELECT COUNT(*) as count FROM reviews").get().count;
+    if (reviewCount === 0) {
+      const demoReviews = [
+        { user_id: 1, listing_id: 1, listing_type: 'tour', rating: 5, comment: 'Absolutely breathtaking! A must-see in Rome.', username: 'John Doe' },
+        { user_id: 1, listing_id: 1, listing_type: 'tour', rating: 4, comment: 'Great experience, but a bit crowded.', username: 'Jane Smith' }
+      ];
+      const insert = db.prepare("INSERT INTO reviews (user_id, listing_id, listing_type, rating, comment, username) VALUES (?, ?, ?, ?, ?, ?)");
+      demoReviews.forEach(r => insert.run(r.user_id, r.listing_id, r.listing_type, r.rating, r.comment, r.username));
+    }
+
+    // Courses
+    const courseCount = db.prepare("SELECT COUNT(*) as count FROM courses").get().count;
+    if (courseCount === 0) {
+      const courses = [
+        { title: 'Italian for Beginners', description: 'Learn the basics of Italian language.', image: 'https://picsum.photos/seed/italian/800/600' },
+        { title: 'History of Rome', description: 'Discover the secrets of the Eternal City.', image: 'https://picsum.photos/seed/history/800/600' }
+      ];
+      const insert = db.prepare("INSERT INTO courses (title, description, image) VALUES (?, ?, ?)");
+      courses.forEach(c => {
+        const result = insert.run(c.title, c.description, c.image);
+        const courseId = result.lastInsertRowid;
+        db.prepare("INSERT INTO lessons (course_id, title, content, order_index) VALUES (?, ?, ?, ?)").run(courseId, 'Lesson 1', 'Welcome to the course!', 1);
+      });
+    }
+  };
+  seedData();
 
   // API Routes
-  app.post("/api/register", (req, res) => {
+  app.post("/api/register", async (req, res) => {
     const { email, password, name } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: "Missing fields" });
     try {
-      // Check if this is the first user (excluding demo user)
-      const userCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE email != 'demo@italiago.com'").get().count;
-      const role = userCount === 0 ? 'admin' : 'user';
-
-      const result = db.prepare("INSERT INTO users (email, password, name, wallet_balance, bonus, role) VALUES (?, ?, ?, ?, ?, ?)").run(
-        email,
-        password,
-        name,
-        0.0,
-        0,
-        role
-      );
-      req.session.userId = result.lastInsertRowid as number;
-      
-      // Notify admins
-      db.prepare("INSERT INTO notifications (type, message) VALUES ('registration', ?)").run(`New user registered: ${email} as ${role}`);
-      
-      res.json(db.prepare("SELECT * FROM users WHERE id = ?").get(req.session.userId));
-    } catch (error) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const result = db.prepare("INSERT INTO users (email, password, name) VALUES (?, ?, ?)").run(email, hashedPassword, name);
+      const user = { id: result.lastInsertRowid, email, name, role: 'user' };
+      const token = jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
+      res.json({ user, token });
+    } catch (err) {
       res.status(400).json({ error: "Email already exists" });
     }
   });
 
-  app.post("/api/login", (req, res) => {
+  app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
     const user: any = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-    
-    if (user && user.disabled) {
-      return res.status(403).json({ error: "Account is disabled. Please contact support." });
-    }
-
-    // Check for rate limiting / failed attempts
-    const recentFailures = db.prepare("SELECT COUNT(*) as count FROM failed_logins WHERE email = ? AND created_at > datetime('now', '-15 minutes')").get(email);
-    if (recentFailures.count >= 5) {
-      return res.status(429).json({ error: "Too many failed attempts. Account locked for 15 minutes." });
-    }
-
-    if (user && user.password === password) {
-      req.session.userId = user.id;
-      db.prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
-      db.prepare("INSERT INTO activity_logs (user_id, action, page, ip) VALUES (?, 'LOGIN', '/', ?)").run(user.id, req.ip);
-      res.json(user);
+    if (user && await bcrypt.compare(password, user.password)) {
+      const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+      const userToReturn = { id: user.id, email: user.email, name: user.name, role: user.role, avatar_url: user.avatar_url, wallet_balance: user.wallet_balance, bonus: user.bonus, status: user.status };
+      res.json({ user: userToReturn, token });
     } else {
-      db.prepare("INSERT INTO failed_logins (email, ip) VALUES (?, ?)").run(email, req.ip);
-      
-      // If 5th failure, notify admins
-      if (recentFailures.count === 4) {
-        db.prepare("INSERT INTO notifications (type, message) VALUES ('security', ?)").run(`Multiple failed login attempts for ${email}`);
-      }
-      
       res.status(401).json({ error: "Invalid credentials" });
     }
   });
 
+  app.get("/api/users/me", authenticateToken, (req: any, res) => {
+    const user = db.prepare("SELECT id, email, name, role, avatar_url, wallet_balance, bonus, status FROM users WHERE id = ?").get(req.user.id);
+    res.json(user);
+  });
+
+  app.get("/api/user", authenticateToken, (req: any, res) => {
+    const user = db.prepare("SELECT id, email, name, role, avatar_url, wallet_balance, bonus, status FROM users WHERE id = ?").get(req.user.id);
+    res.json(user);
+  });
+
+  // Generic Listings Fetcher
+  const fetchListings = (table: string, type: string) => {
+    const items = db.prepare(`SELECT * FROM ${table}`).all();
+    return items.map((item: any) => {
+      const reviews: any = db.prepare("SELECT rating FROM reviews WHERE listing_id = ? AND listing_type = ?").all(item.id, type);
+      const avgRating = reviews.length > 0 ? reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length : 0;
+      return { 
+        ...item, 
+        type, 
+        name: item.title,
+        stars: Math.round(avgRating) || 5,
+        rating: avgRating, 
+        reviews_count: reviews.length 
+      };
+    });
+  };
+
+  app.get("/api/tours", (req, res) => res.json(fetchListings('tours', 'tour')));
+  app.get("/api/restaurants", (req, res) => res.json(fetchListings('restaurants', 'restaurant')));
+  app.get("/api/hotels", (req, res) => res.json(fetchListings('hotels', 'hotel')));
+  app.get("/api/taxi", (req, res) => res.json(fetchListings('taxi_services', 'taxi')));
+  app.get("/api/experiences", (req, res) => res.json(fetchListings('experiences', 'experience')));
+  app.get("/api/rentals", (req, res) => res.json(fetchListings('rentals', 'rental')));
+  app.get("/api/events", (req, res) => res.json(fetchListings('events', 'event')));
+
   app.get("/api/listings", (req, res) => {
-    const listings = db.prepare("SELECT * FROM listings").all();
-    res.json(listings.map(l => ({
-      ...l,
-      amenities: l.amenities ? JSON.parse(l.amenities) : [],
-      highlights: l.highlights ? JSON.parse(l.highlights) : []
-    })));
+    const tours = fetchListings('tours', 'tour');
+    const restaurants = fetchListings('restaurants', 'restaurant');
+    const hotels = fetchListings('hotels', 'hotel');
+    const taxi = fetchListings('taxi_services', 'taxi');
+    const experiences = fetchListings('experiences', 'experience');
+    const rentals = fetchListings('rentals', 'rental');
+    const events = fetchListings('events', 'event');
+    res.json([...tours, ...restaurants, ...hotels, ...taxi, ...experiences, ...rentals, ...events]);
+  });
+
+  app.get("/api/:type/:id", (req, res) => {
+    const { type, id } = req.params;
+    const tableMap: any = { 
+      tours: 'tours', 
+      restaurants: 'restaurants', 
+      hotels: 'hotels', 
+      taxi: 'taxi_services',
+      experiences: 'experiences',
+      rentals: 'rentals',
+      events: 'events'
+    };
+    const table = tableMap[type];
+    if (!table) return res.status(404).json({ error: "Not found" });
+    const item: any = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+    if (!item) return res.status(404).json({ error: "Not found" });
+    const reviews = db.prepare("SELECT * FROM reviews WHERE listing_id = ? AND listing_type = ? ORDER BY created_at DESC").all(id, type.slice(0, -1));
+    res.json({ ...item, reviews });
+  });
+
+  app.post("/api/reviews", authenticateToken, (req: any, res) => {
+    const { listing_id, itemId, listing_type, type, rating, comment } = req.body;
+    const finalId = listing_id || itemId;
+    const finalType = listing_type || type;
+    db.prepare("INSERT INTO reviews (user_id, listing_id, listing_type, rating, comment, username) VALUES (?, ?, ?, ?, ?, ?)").run(
+      req.user.id, finalId, finalType, rating, comment, req.user.name
+    );
+    res.json({ success: true });
+  });
+
+  app.post("/api/bookings", authenticateToken, (req: any, res) => {
+    const { listing_id, itemId, listing_type, type, date, guests, amount } = req.body;
+    const finalId = listing_id || itemId;
+    const finalType = listing_type || type;
+    const result = db.prepare("INSERT INTO bookings (user_id, listing_id, listing_type, date, guests, amount) VALUES (?, ?, ?, ?, ?, ?)").run(
+      req.user.id, finalId, finalType, date || new Date().toISOString(), guests || 1, amount
+    );
+    res.json({ id: result.lastInsertRowid });
+  });
+
+  // Admin Panel
+  app.get("/api/admin/stats", authenticateToken, isAdminMiddleware, (req, res) => {
+    const users = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+    const bookings = db.prepare("SELECT COUNT(*) as count FROM bookings").get().count;
+    const revenue = db.prepare("SELECT SUM(amount) as total FROM bookings WHERE status = 'confirmed'").get().total || 0;
+    res.json({ users, bookings, revenue });
+  });
+
+  app.get("/api/admin/notifications", authenticateToken, isAdminMiddleware, (req, res) => {
+    const notifications = db.prepare("SELECT * FROM admin_notifications ORDER BY created_at DESC LIMIT 50").all();
+    res.json(notifications);
+  });
+
+  app.post("/api/admin/notifications/read", authenticateToken, isAdminMiddleware, (req, res) => {
+    db.prepare("UPDATE admin_notifications SET read = 1").run();
+    res.json({ success: true });
+  });
+
+  app.get("/api/admin/bookings", authenticateToken, isAdminMiddleware, (req, res) => {
+    const bookings = db.prepare(`
+      SELECT b.*, u.name as user_name, u.email as user_email 
+      FROM bookings b 
+      JOIN users u ON b.user_id = u.id 
+      ORDER BY b.created_at DESC
+    `).all();
+    res.json(bookings);
+  });
+
+  app.get("/api/admin/listings", authenticateToken, isAdminMiddleware, (req, res) => {
+    const tours = db.prepare("SELECT *, 'tour' as type FROM tours").all();
+    const restaurants = db.prepare("SELECT *, 'restaurant' as type FROM restaurants").all();
+    const hotels = db.prepare("SELECT *, 'hotel' as type FROM hotels").all();
+    const taxi = db.prepare("SELECT *, 'taxi' as type FROM taxi_services").all();
+    res.json([...tours, ...restaurants, ...hotels, ...taxi]);
   });
 
   // Learning Platform Routes
@@ -472,9 +696,8 @@ async function startServer() {
     res.json({ ...course, lessons });
   });
 
-  app.get("/api/user/progress", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
+  app.get("/api/user/progress", authenticateToken, (req: any, res) => {
+    const user = req.user;
     const progress = db.prepare(`
       SELECT p.*, c.title as course_title, l.title as lesson_title 
       FROM user_progress p
@@ -485,191 +708,62 @@ async function startServer() {
     res.json(progress);
   });
 
-  app.post("/api/user/progress", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const { courseId, lessonId, status } = req.body;
-    
-    const existing = db.prepare("SELECT id FROM user_progress WHERE user_id = ? AND course_id = ? AND lesson_id = ?").get(user.id, courseId, lessonId);
-    
-    if (existing) {
-      db.prepare("UPDATE user_progress SET status = ?, last_watched_at = CURRENT_TIMESTAMP WHERE id = ?").run(status, existing.id);
-    } else {
-      db.prepare("INSERT INTO user_progress (user_id, course_id, lesson_id, status) VALUES (?, ?, ?, ?)").run(user.id, courseId, lessonId, status);
-    }
-    res.json({ success: true });
-  });
-
-  app.get("/api/mentors", (req, res) => {
-    const mentors = db.prepare("SELECT * FROM mentors").all();
-    const user = (req as any).user;
-    if (user) {
-      const followed = db.prepare("SELECT mentor_id FROM user_mentors WHERE user_id = ?").all(user.id).map((m: any) => m.mentor_id);
-      res.json(mentors.map((m: any) => ({ ...m, isFollowed: followed.includes(m.id) })));
-    } else {
-      res.json(mentors);
-    }
-  });
-
-  app.post("/api/mentors/follow", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const { mentorId } = req.body;
-    
-    const existing = db.prepare("SELECT id FROM user_mentors WHERE user_id = ? AND mentor_id = ?").get(user.id, mentorId);
-    if (existing) {
-      db.prepare("DELETE FROM user_mentors WHERE id = ?").run(existing.id);
-      res.json({ followed: false });
-    } else {
-      db.prepare("INSERT INTO user_mentors (user_id, mentor_id) VALUES (?, ?)").run(user.id, mentorId);
-      res.json({ followed: true });
-    }
-  });
-
-  app.get("/api/tasks", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const tasks = db.prepare(`
-      SELECT t.*, ut.status, ut.grade, c.title as course_title
-      FROM tasks t
-      JOIN courses c ON t.course_id = c.id
-      LEFT JOIN user_tasks ut ON t.id = ut.task_id AND ut.user_id = ?
-    `).all(user.id);
-    res.json(tasks);
-  });
-
-  app.get("/api/messages", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
+  // Messages
+  app.get("/api/messages", authenticateToken, (req: any, res) => {
     const messages = db.prepare(`
       SELECT m.*, u.name as sender_name, u.avatar_url as sender_avatar
       FROM messages m
       JOIN users u ON m.sender_id = u.id
       WHERE m.receiver_id = ? OR m.sender_id = ?
       ORDER BY m.created_at DESC
-    `).all(user.id, user.id);
+    `).all(req.user.id, req.user.id);
     res.json(messages);
   });
 
-  app.post("/api/messages", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
+  app.post("/api/messages", authenticateToken, (req: any, res) => {
     const { receiverId, content } = req.body;
-    db.prepare("INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)").run(user.id, receiverId, content);
+    db.prepare("INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)").run(req.user.id, receiverId, content);
     res.json({ success: true });
   });
 
-  app.get("/api/friends", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
-    const friends = db.prepare(`
-      SELECT u.id, u.name, u.avatar_url, u.role, f.status
-      FROM friends f
-      JOIN users u ON (f.user_id = u.id OR f.friend_id = u.id)
-      WHERE (f.user_id = ? OR f.friend_id = ?) AND u.id != ?
-    `).all(user.id, user.id, user.id);
-    res.json(friends);
+  // Admin Panel Extended
+  app.get("/api/admin/users", authenticateToken, isAdminMiddleware, (req, res) => {
+    res.json(db.prepare("SELECT id, email, name, role, disabled, last_login, created_at FROM users").all());
   });
 
-  app.get("/api/search", (req, res) => {
-    const query = req.query.q as string;
-    if (!query) return res.json({ courses: [], mentors: [] });
-    
-    const courses = db.prepare("SELECT * FROM courses WHERE title LIKE ? OR description LIKE ?").all(`%${query}%`, `%${query}%`);
-    const mentors = db.prepare("SELECT * FROM mentors WHERE name LIKE ? OR role LIKE ?").all(`%${query}%`, `%${query}%`);
-    
-    res.json({ courses, mentors });
-  });
-
-  app.post("/api/admin/listings", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-
-    const listing = req.body;
-    if (!listing.id) listing.id = Math.random().toString(36).substr(2, 9);
-    
-    const data = {
-      id: listing.id,
-      type: listing.type || 'hotel',
-      name: listing.name || '',
-      location: listing.location || '',
-      price: listing.price || 0,
-      price_level: listing.price_level || 'medium',
-      image: listing.image || '',
-      stars: listing.stars || 5,
-      description: listing.description || null,
-      amenities: listing.amenities ? JSON.stringify(listing.amenities) : null,
-      history: listing.history || null,
-      chef: listing.chef || null,
-      michelin_stars: listing.michelin_stars || null,
-      specialty: listing.specialty || null,
-      duration: listing.duration || null,
-      highlights: listing.highlights ? JSON.stringify(listing.highlights) : null,
-      info: listing.info || null,
-      category: listing.category || 'Standard'
-    };
-
-    try {
-      db.prepare(`
-        INSERT OR REPLACE INTO listings (id, type, name, location, price, price_level, image, stars, description, amenities, history, chef, michelin_stars, specialty, duration, highlights, info, category)
-        VALUES (@id, @type, @name, @location, @price, @price_level, @image, @stars, @description, @amenities, @history, @chef, @michelin_stars, @specialty, @duration, @highlights, @info, @category)
-      `).run(data);
-      res.json({ success: true, id: listing.id });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.get("/api/admin/users", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
-    const users = db.prepare("SELECT * FROM users").all();
-    res.json(users);
-  });
-
-  app.post("/api/admin/users/:id/role", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
-    const { role } = req.body;
-    const targetUser: any = db.prepare("SELECT * FROM users WHERE id = ?").get(req.params.id);
-    
-    if (!targetUser) return res.status(404).json({ error: "User not found" });
-
-    db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, req.params.id);
-    
-    db.prepare(`
-      INSERT INTO admin_logs (admin_id, action, target_id, old_value, new_value, ip)
-      VALUES (?, 'ROLE_CHANGE', ?, ?, ?, ?)
-    `).run(currentUser.id, req.params.id, targetUser.role, role, req.ip);
-
-    db.prepare("INSERT INTO notifications (type, message) VALUES ('role_change', ?)").run(`User ${targetUser.email} role changed from ${targetUser.role} to ${role}`);
-
-    res.json({ success: true });
-  });
-
-  app.post("/api/admin/users/:id/status", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
+  app.post("/api/admin/users/:id/status", authenticateToken, isAdminMiddleware, (req, res) => {
     const { disabled } = req.body;
     db.prepare("UPDATE users SET disabled = ? WHERE id = ?").run(disabled ? 1 : 0, req.params.id);
-    
-    db.prepare(`
-      INSERT INTO admin_logs (admin_id, action, target_id, new_value, ip)
-      VALUES (?, 'STATUS_CHANGE', ?, ?, ?)
-    `).run(currentUser.id, req.params.id, disabled ? 'DISABLED' : 'ENABLED', req.ip);
-
     res.json({ success: true });
   });
 
-  app.get("/api/admin/logs/activity", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
+  app.post("/api/admin/users/:id/role", authenticateToken, isAdminMiddleware, (req, res) => {
+    const { role } = req.body;
+    db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, req.params.id);
+    res.json({ success: true });
+  });
+
+  app.post("/api/admin/listings", authenticateToken, isAdminMiddleware, (req, res) => {
+    const { id, type, name, location, price, stars, description, image, category } = req.body;
+    const tableMap: any = { tour: 'tours', restaurant: 'restaurants', hotel: 'hotels', taxi: 'taxi_services' };
+    const table = tableMap[type];
+    if (!table) return res.status(400).json({ error: "Invalid type" });
+
+    if (id) {
+      db.prepare(`UPDATE ${table} SET name = ?, location = ?, price = ?, stars = ?, description = ?, image = ?, category = ? WHERE id = ?`).run(
+        name, location, price, stars, description, image, category, id
+      );
+    } else {
+      db.prepare(`INSERT INTO ${table} (name, location, price, stars, description, image, category) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+        name, location, price, stars, description, image, category
+      );
+    }
+    res.json({ success: true });
+  });
+
+  app.get("/api/admin/logs", authenticateToken, isAdminMiddleware, (req, res) => {
     const logs = db.prepare(`
-      SELECT l.*, u.name as user_name, u.email as user_email 
+      SELECT l.*, u.name as user_name, u.email as user_email
       FROM activity_logs l 
       JOIN users u ON l.user_id = u.id 
       ORDER BY l.created_at DESC LIMIT 100
@@ -677,211 +771,200 @@ async function startServer() {
     res.json(logs);
   });
 
-  app.get("/api/admin/logs/admin", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
+  app.get("/api/admin/logs/activity", authenticateToken, isAdminMiddleware, (req, res) => {
     const logs = db.prepare(`
-      SELECT l.*, u.name as admin_name 
-      FROM admin_logs l 
-      JOIN users u ON l.admin_id = u.id 
+      SELECT l.*, u.name as user_name, u.email as user_email
+      FROM activity_logs l 
+      JOIN users u ON l.user_id = u.id 
       ORDER BY l.created_at DESC LIMIT 100
     `).all();
     res.json(logs);
   });
 
-  app.get("/api/admin/notifications", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
-    const notifications = db.prepare("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50").all();
-    res.json(notifications);
+  app.get("/api/admin/logs/admin", authenticateToken, isAdminMiddleware, (req, res) => {
+    // For now return empty as we don't have a separate admin_logs table yet
+    res.json([]);
   });
 
-  app.post("/api/admin/notifications/read", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
-    db.prepare("UPDATE notifications SET read = 1").run();
-    res.json({ success: true });
-  });
-
-  app.get("/api/admin/analytics/activity", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
-    const dailyActivity = db.prepare(`
-      SELECT date(created_at) as date, count(*) as count 
+  app.get("/api/admin/analytics/activity", authenticateToken, isAdminMiddleware, (req, res) => {
+    const stats = db.prepare(`
+      SELECT date(created_at) as date, COUNT(*) as count 
       FROM activity_logs 
-      WHERE created_at > date('now', '-30 days')
-      GROUP BY date(created_at)
+      GROUP BY date(created_at) 
+      ORDER BY date DESC LIMIT 30
     `).all();
-    
-    res.json(dailyActivity);
+    res.json(stats.reverse());
   });
 
-  app.get("/api/admin/messages", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
+  app.get("/api/admin/messages", authenticateToken, isAdminMiddleware, (req, res) => {
     const messages = db.prepare(`
       SELECT m.*, u.name as sender_name, u.avatar_url 
       FROM admin_messages m 
       JOIN users u ON m.sender_id = u.id 
-      ORDER BY m.created_at ASC LIMIT 50
+      ORDER BY m.created_at ASC LIMIT 100
     `).all();
     res.json(messages);
   });
 
-  app.post("/api/admin/messages", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-    
+  app.post("/api/admin/messages", authenticateToken, isAdminMiddleware, (req: any, res) => {
     const { message } = req.body;
-    db.prepare("INSERT INTO admin_messages (sender_id, message) VALUES (?, ?)").run(currentUser.id, message);
-    res.json({ success: true });
-  });
-
-  app.get("/api/admin/bookings", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
+    const result = db.prepare("INSERT INTO admin_messages (sender_id, message) VALUES (?, ?)").run(req.user.id, message);
+    const newMessage = db.prepare(`
+      SELECT m.*, u.name as sender_name, u.avatar_url 
+      FROM admin_messages m 
+      JOIN users u ON m.sender_id = u.id 
+      WHERE m.id = ?
+    `).get(result.lastInsertRowid);
     
-    const bookings = db.prepare(`
-      SELECT b.*, u.name as user_name 
-      FROM bookings b 
-      JOIN users u ON b.user_id = u.id 
-      ORDER BY b.created_at DESC
-    `).all();
-    res.json(bookings);
-  });
-
-  app.delete("/api/admin/listings/:id", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser || currentUser.role !== 'admin') return res.status(403).json({ error: "Unauthorized" });
-
-    db.prepare("DELETE FROM listings WHERE id = ?").run(req.params.id);
-    res.json({ success: true });
-  });
-
-  app.get("/api/suggestions", (req, res) => {
-    // Return a mix of items for suggestions
-    const suggestions = [
-      { id: 's1', name: 'Belmond Hotel Cipriani', type: 'hotel', price: 1200, rating: 5, image: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=400' },
-      { id: 's2', name: 'Osteria Francescana', type: 'restaurant', price: 300, rating: 5, image: 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&q=80&w=400' },
-      { id: 's3', name: 'Amalfi Coast Boat Tour', type: 'tour', price: 150, rating: 4.8, image: 'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?auto=format&fit=crop&q=80&w=400' },
-      { id: 's4', name: 'Uffizi Gallery Fast Track', type: 'tour', price: 45, rating: 4.9, image: 'https://images.unsplash.com/photo-1543487945-139a97f387d5?auto=format&fit=crop&q=80&w=400' },
-    ];
-    res.json(suggestions);
-  });
-
-  app.get("/api/user", (req, res) => {
-    res.json((req as any).user);
-  });
-
-  app.post("/api/log-activity", (req, res) => {
-    const user = (req as any).user;
-    if (!user) return res.status(401).json({ error: "Unauthorized" });
-    
-    const { action, page, details } = req.body;
-    try {
-      db.prepare(`
-        INSERT INTO activity_logs (user_id, action, page, details, ip, user_agent)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(
-        user.id,
-        action,
-        page,
-        details ? JSON.stringify(details) : null,
-        req.ip,
-        req.get('user-agent')
-      );
-      res.json({ success: true });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post("/api/logout", (req, res) => {
-    const user = (req as any).user;
-    if (user) {
-      db.prepare("INSERT INTO activity_logs (user_id, action, page, ip) VALUES (?, 'LOGOUT', '/', ?)").run(user.id, req.ip);
-    }
-    req.session.destroy((err) => {
-      if (err) return res.status(500).json({ error: "Could not log out" });
-      res.json({ success: true });
+    // Broadcast to other admins
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'admin_chat', message: newMessage }));
+      }
     });
+    
+    res.json(newMessage);
   });
 
-  app.post("/api/user/profile", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
-    const { name, avatar_url } = req.body;
+  app.delete("/api/admin/listings/:id", authenticateToken, isAdminMiddleware, (req, res) => {
+    const { id } = req.params;
+    const tables = ['tours', 'restaurants', 'hotels', 'taxi_services'];
+    let deleted = false;
     
+    for (const table of tables) {
+      const result = db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+      if (result.changes > 0) {
+        deleted = true;
+        break;
+      }
+    }
+    
+    if (deleted) {
+      notifyAdmins('system', `Listing ID ${id} was deleted by ${(req as any).user.name}`);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: "Listing not found" });
+    }
+  });
+
+  // Offers & Game
+  app.get("/api/offers", authenticateToken, (req, res) => {
+    const offers = [
+      { id: 'o1', title: '10% Off Next Ride', description: 'Get 10% off your next luxury transport.', cost: 500, code: 'RIDE10' },
+      { id: 'o2', title: 'Free Dessert', description: 'Complimentary dessert at any partner restaurant.', cost: 300, code: 'SWEET' },
+      { id: 'o3', title: 'VIP Lounge Access', description: 'Access to exclusive airport lounges.', cost: 1000, code: 'VIP' },
+    ];
+    res.json(offers);
+  });
+
+  app.post("/api/redeem", authenticateToken, (req: any, res) => {
+    const { offerId, cost } = req.body;
+    const user = db.prepare("SELECT bonus FROM users WHERE id = ?").get(req.user.id);
+    if (user.bonus < cost) return res.status(400).json({ error: "Insufficient points" });
+    
+    db.prepare("UPDATE users SET bonus = bonus - ? WHERE id = ?").run(cost, req.user.id);
+    res.json({ success: true });
+  });
+
+  app.post("/api/game-win", authenticateToken, (req: any, res) => {
+    db.prepare("UPDATE users SET last_game_win = CURRENT_TIMESTAMP, bonus = bonus + 50 WHERE id = ?").run(req.user.id);
+    res.json({ success: true });
+  });
+
+  app.post("/api/log-activity", authenticateToken, (req: any, res) => {
+    const { action, page } = req.body;
+    db.prepare("INSERT INTO activity_logs (user_id, action, page, ip, user_agent) VALUES (?, ?, ?, ?, ?)").run(
+      req.user.id, action, page, req.ip, req.get('user-agent')
+    );
+    res.json({ success: true });
+  });
+
+  // Social & Learning Extras
+  app.get("/api/friends", authenticateToken, (req, res) => res.json([]));
+  app.get("/api/mentors", authenticateToken, (req, res) => res.json([]));
+  app.post("/api/mentors/follow", authenticateToken, (req, res) => res.json({ success: true }));
+  app.get("/api/tasks", authenticateToken, (req, res) => res.json([]));
+  app.get("/api/search", (req, res) => {
+    const { q } = req.query;
+    // Simple search across all listings
+    const tours = fetchListings('tours', 'tour').filter((l: any) => l.name.toLowerCase().includes(String(q).toLowerCase()));
+    const restaurants = fetchListings('restaurants', 'restaurant').filter((l: any) => l.name.toLowerCase().includes(String(q).toLowerCase()));
+    const hotels = fetchListings('hotels', 'hotel').filter((l: any) => l.name.toLowerCase().includes(String(q).toLowerCase()));
+    res.json([...tours, ...restaurants, ...hotels]);
+  });
+
+  // User Profile
+  app.post("/api/user/profile", authenticateToken, (req: any, res) => {
+    const { name, avatar_url } = req.body;
     try {
       db.prepare("UPDATE users SET name = ?, avatar_url = ? WHERE id = ?").run(
-        name || currentUser.name,
-        avatar_url || currentUser.avatar_url,
-        currentUser.id
+        name, avatar_url, req.user.id
       );
-      res.json(db.prepare("SELECT * FROM users WHERE id = ?").get(currentUser.id));
-    } catch (e) {
+      const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+      res.json(user);
+    } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
   });
 
-  app.get("/api/bookings", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
-    const bookings = db.prepare("SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC").all(currentUser.id);
+  // Bookings
+  app.get("/api/bookings", authenticateToken, (req: any, res) => {
+    const bookings = db.prepare("SELECT * FROM bookings WHERE user_id = ? ORDER BY created_at DESC").all(req.user.id);
     res.json(bookings);
   });
 
-  app.post("/api/bookings", (req, res) => {
-    const { type, itemName, details, amount, pointsUsed, minigameDiscount } = req.body;
-    const currentUser: any = (req as any).user;
-    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
-    
-    const user = db.prepare("SELECT id, bonus, total_spent FROM users WHERE id = ?").get(currentUser.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-    
-    let baseAmount = amount;
-    if (minigameDiscount) {
-      baseAmount = amount * 0.9; // 10% discount
+  app.post("/api/bookings", authenticateToken, (req: any, res) => {
+    const { listing_id, listing_type, date, guests, amount } = req.body;
+    try {
+      const result = db.prepare("INSERT INTO bookings (user_id, listing_id, listing_type, date, guests, amount) VALUES (?, ?, ?, ?, ?, ?)").run(
+        req.user.id, listing_id, listing_type, date, guests, amount
+      );
+      res.json({ id: result.lastInsertRowid, status: 'pending' });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
-
-    const discount = pointsUsed ? Math.min(pointsUsed / 10, baseAmount) : 0; // 10 points = €1
-    const finalAmount = baseAmount - discount;
-    
-    // Calculate 15% bonus on the final paid amount
-    const bonusEarned = Math.floor(finalAmount * 0.15);
-    
-    let bookingId: number | bigint = 0;
-    db.transaction(() => {
-      const result = db.prepare(
-        "INSERT INTO bookings (user_id, type, item_name, details, amount) VALUES (?, ?, ?, ?, ?)"
-      ).run(user.id, type, itemName, details, finalAmount);
-      bookingId = result.lastInsertRowid;
-
-      const bonusUpdate = bonusEarned - (pointsUsed || 0);
-      const newTotalSpent = user.total_spent + finalAmount;
-      
-      let newStatus = 'Normal';
-      if (newTotalSpent >= 10000) newStatus = 'Rich';
-      else if (newTotalSpent >= 2000) newStatus = 'Pro';
-      else if (newTotalSpent >= 500) newStatus = 'Advanced';
-
-      db.prepare(
-        "UPDATE users SET bonus = bonus + ?, has_purchased = 1, total_spent = ?, status = ?, last_game_win = NULL WHERE id = ?"
-      ).run(bonusUpdate, newTotalSpent, newStatus, user.id);
-    })();
-
-    res.json({ id: bookingId, status: "confirmed", bonusEarned, finalAmount });
   });
 
-  app.post("/api/game-win", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
-    db.prepare("UPDATE users SET last_game_win = CURRENT_TIMESTAMP WHERE id = ?").run(currentUser.id);
+  // Reviews
+  app.get("/api/reviews/:itemId", (req, res) => {
+    const { type } = req.query;
+    let query = `
+      SELECT r.*, u.name as user_name 
+      FROM reviews r 
+      JOIN users u ON r.user_id = u.id 
+      WHERE r.listing_id = ? 
+    `;
+    const params: any[] = [req.params.itemId];
+    
+    if (type) {
+      query += " AND r.listing_type = ?";
+      params.push(type);
+    }
+    
+    query += " ORDER BY r.created_at DESC";
+    
+    const reviews = db.prepare(query).all(...params);
+    res.json(reviews);
+  });
+
+  app.post("/api/reviews", authenticateToken, (req: any, res) => {
+    const { listing_id, listing_type, rating, comment } = req.body;
+    try {
+      db.prepare("INSERT INTO reviews (user_id, listing_id, listing_type, rating, comment, username) VALUES (?, ?, ?, ?, ?, ?)").run(
+        req.user.id, listing_id, listing_type, rating, comment, req.user.name
+      );
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/game-win", authenticateToken, (req: any, res) => {
+    db.prepare("UPDATE users SET last_game_win = CURRENT_TIMESTAMP WHERE id = ?").run(req.user.id);
+    res.json({ status: "ok" });
+  });
+
+  app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
@@ -927,167 +1010,28 @@ async function startServer() {
     }
   });
 
-  // Reviews
-  app.get("/api/reviews/:itemId", (req, res) => {
-    try {
-      const reviews = db.prepare(`
-        SELECT r.*, u.name as user_name 
-        FROM reviews r 
-        JOIN users u ON r.user_id = u.id 
-        WHERE r.item_id = ? 
-        ORDER BY r.created_at DESC
-      `).all(req.params.itemId);
-      res.json(reviews);
-    } catch (err) {
-      res.status(500).json({ error: "Failed to fetch reviews" });
-    }
-  });
-
-  app.post("/api/reviews", express.json(), (req, res) => {
-    const { itemId, rating, comment } = req.body;
-    const currentUser: any = (req as any).user;
-    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
-    
-    if (!itemId || !rating || !comment) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-    
-    try {
-      const result = db.prepare("INSERT INTO reviews (user_id, item_id, rating, comment) VALUES (?, ?, ?, ?)").run(currentUser.id, itemId, rating, comment);
-      const newReview = db.prepare(`
-        SELECT r.*, u.name as user_name 
-        FROM reviews r 
-        JOIN users u ON r.user_id = u.id 
-        WHERE r.id = ?
-      `).get(result.lastInsertRowid);
-      res.json(newReview);
-    } catch (err) {
-      res.status(500).json({ error: "Failed to post review" });
-    }
-  });
-
-  // Seed some fake reviews if table is empty
-  const reviewCount = db.prepare("SELECT COUNT(*) as count FROM reviews").get().count;
-  if (reviewCount === 0) {
-    const fakeReviews = [
-      { user_id: 1, item_id: 'h1', rating: 5, comment: 'Absolutely stunning! The view of the lagoon is unforgettable.' },
-      { user_id: 1, item_id: 'h1', rating: 4, comment: 'Great service, but a bit pricey.' },
-      { user_id: 1, item_id: 'r1', rating: 5, comment: 'The best meal of my life. Massimo is a genius.' },
-      { user_id: 1, item_id: 'r5', rating: 5, comment: 'Simple, authentic, and delicious. Best pizza in Naples!' },
-      { user_id: 1, item_id: 'h2', rating: 5, comment: 'The floating pool is a dream. Highly recommend!' },
-      { user_id: 1, item_id: 'r2', rating: 4, comment: 'Exquisite food and amazing views of Rome.' },
-      { user_id: 1, item_id: 'h3', rating: 5, comment: 'Portofino is magical, and this hotel is its crown jewel.' },
-      { user_id: 1, item_id: 'r3', rating: 5, comment: 'The wine cellar is like a museum. Incredible experience.' },
-      { user_id: 1, item_id: 'h4', rating: 4, comment: 'Very central and the rooftop bar is excellent for sunset drinks.' },
-      { user_id: 1, item_id: 'r4', rating: 5, comment: 'The Paccheri alla Vittorio is a must-try. Pure Italian joy.' },
-      { user_id: 1, item_id: 'h9', rating: 5, comment: 'Ravello is so peaceful, and the infinity pool here is the best in the world.' },
-      { user_id: 1, item_id: 'r7', rating: 5, comment: 'Alba truffles and this restaurant are a match made in heaven.' },
-      { user_id: 1, item_id: 'h10', rating: 5, comment: 'The Secret Garden is the perfect place to escape the Roman heat.' },
-      { user_id: 1, item_id: 'r12', rating: 4, comment: 'Classic Sorbillo. Long wait but totally worth it for the crust.' },
-      { user_id: 1, item_id: 'h11', rating: 5, comment: 'Living like a Medici for a few days. The gardens are spectacular.' },
-    ];
-    const insertReview = db.prepare("INSERT INTO reviews (user_id, item_id, rating, comment) VALUES (?, ?, ?, ?)");
-    fakeReviews.forEach(r => insertReview.run(r.user_id, r.item_id, r.rating, r.comment));
-    console.log("Seeded fake reviews.");
-  }
-
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
-
-  // Vite middleware for development
+  // Vite Integration & Static Files
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
   } else {
     app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
-    });
+    app.get("*", (req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
   }
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-
-  const wss = new WebSocketServer({ server });
-  const games = new Map<string, { players: WebSocket[], board: (string|null)[], turn: number }>();
-
-  wss.on('connection', (ws) => {
-    let roomId: string | null = null;
-    ws.on('message', (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-        if (message.type === 'join') {
-          roomId = message.roomId;
-          if (!games.has(roomId!)) {
-            games.set(roomId!, { players: [ws], board: Array(9).fill(null), turn: 0 });
-            ws.send(JSON.stringify({ type: 'waiting' }));
-          } else {
-            const game = games.get(roomId!)!;
-            if (game.players.length < 2) {
-              game.players.push(ws);
-              game.players[0].send(JSON.stringify({ type: 'start', symbol: 'X', turn: true }));
-              game.players[1].send(JSON.stringify({ type: 'start', symbol: 'O', turn: false }));
-            } else {
-              ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
-            }
-          }
-        }
-        if (message.type === 'move') {
-          const game = games.get(roomId!)!;
-          if (!game) return;
-          const playerIndex = game.players.indexOf(ws);
-          if (playerIndex === game.turn && game.board[message.index] === null) {
-            game.board[message.index] = playerIndex === 0 ? 'X' : 'O';
-            game.turn = 1 - game.turn;
-            game.players.forEach((p, idx) => {
-              p.send(JSON.stringify({ type: 'update', board: game.board, turn: idx === game.turn }));
-            });
-            const winPatterns = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for (const pattern of winPatterns) {
-              const [a, b, c] = pattern;
-              if (game.board[a] && game.board[a] === game.board[b] && game.board[a] === game.board[c]) {
-                game.players.forEach((p, idx) => p.send(JSON.stringify({ type: 'gameOver', winner: idx === playerIndex ? 'you' : 'opponent' })));
-                games.delete(roomId!);
-                return;
-              }
-            }
-            if (!game.board.includes(null)) {
-              game.players.forEach(p => p.send(JSON.stringify({ type: 'gameOver', winner: 'draw' })));
-              games.delete(roomId!);
-            }
-          }
-        }
-      } catch (e) { console.error(e); }
-    });
-    ws.on('close', () => {
-      if (roomId && games.has(roomId)) {
-        const game = games.get(roomId)!;
-        game.players.forEach(p => { if (p !== ws) p.send(JSON.stringify({ type: 'opponentLeft' })); });
-        games.delete(roomId);
-      }
-    });
-  });
-
   // Graceful shutdown
-  process.on('SIGINT', () => {
+  const shutdown = () => {
     console.log('Closing server and database...');
     server.close(() => {
       db.close();
       process.exit(0);
     });
-  });
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 
-  process.on('SIGTERM', () => {
-    console.log('Closing server and database...');
-    server.close(() => {
-      db.close();
-      process.exit(0);
-    });
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 

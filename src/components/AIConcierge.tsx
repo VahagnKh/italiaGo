@@ -6,7 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 export default function AIConcierge({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (open: boolean) => void }) {
   const { language, setLanguage, t } = useLanguage();
-  const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [messages, setMessages] = useState<{ id: string; role: 'user' | 'assistant'; content: string }[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -22,14 +22,14 @@ export default function AIConcierge({ isOpen, setIsOpen }: { isOpen: boolean, se
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      setMessages([{ role: 'assistant', content: t.botGreeting }]);
+      setMessages([{ id: 'initial', role: 'assistant', content: t.botGreeting }]);
     }
   }, [isOpen, t.botGreeting]);
 
   // Update greeting if language changes and it's the only message
   useEffect(() => {
     if (messages.length === 1 && messages[0].role === 'assistant') {
-      setMessages([{ role: 'assistant', content: t.botGreeting }]);
+      setMessages([{ id: 'initial', role: 'assistant', content: t.botGreeting }]);
     }
   }, [t.botGreeting]);
 
@@ -44,15 +44,24 @@ export default function AIConcierge({ isOpen, setIsOpen }: { isOpen: boolean, se
     
     const userMsg = input;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    const userMsgObj = { id: Math.random().toString(36).substr(2, 9), role: 'user' as const, content: userMsg };
+    setMessages(prev => [...prev, userMsgObj]);
     setIsLoading(true);
 
     const langName = language === 'it' ? 'Italian' : language === 'ru' ? 'Russian' : language === 'hy' ? 'Armenian' : 'English';
     const promptWithLang = `Please respond in ${langName}. User says: ${userMsg}`;
 
-    const response = await getTravelAdvice(promptWithLang);
-    setMessages(prev => [...prev, { role: 'assistant', content: response || "I'm sorry, I couldn't process that." }]);
-    setIsLoading(false);
+    try {
+      const response = await getTravelAdvice(promptWithLang);
+      const assistantMsgObj = { id: Math.random().toString(36).substr(2, 9), role: 'assistant' as const, content: response || "I'm sorry, I couldn't process that." };
+      setMessages(prev => [...prev, assistantMsgObj]);
+    } catch (err) {
+      console.error('AI Concierge Error:', err);
+      const errorMsgObj = { id: Math.random().toString(36).substr(2, 9), role: 'assistant' as const, content: "I'm having trouble connecting right now. Please try again later." };
+      setMessages(prev => [...prev, errorMsgObj]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -143,11 +152,11 @@ export default function AIConcierge({ isOpen, setIsOpen }: { isOpen: boolean, se
 
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 bg-paper/30 scroll-smooth">
-              {messages.map((msg, i) => (
+              {messages.map((msg) => (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  key={i} 
+                  key={msg.id} 
                   className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
