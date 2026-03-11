@@ -576,7 +576,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
                   <div className="p-4 h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={50} minHeight={300}>
                       <AreaChart data={analyticsData}>
                         <defs>
                           <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
@@ -866,7 +866,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                 <div className="lg:col-span-2 bg-white rounded border border-border overflow-hidden shadow-sm">
                   <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">User Retention Rate</div>
                   <div className="p-6 h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={50} minHeight={300}>
                       <LineChart data={analyticsData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                         <XAxis dataKey="date" fontSize={10} />
@@ -880,7 +880,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                 <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
                   <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">Traffic Sources</div>
                   <div className="p-6 h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" debounce={50} minHeight={300}>
                       <PieChart>
                         <Pie
                           data={[
@@ -1026,7 +1026,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                     l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                     l.location.toLowerCase().includes(searchQuery.toLowerCase())
                   ).map((listing) => (
-                    <motion.div key={listing.id} layout className="bg-white rounded border border-border overflow-hidden shadow-sm group">
+                    <motion.div key={`${listing.type}-${listing.id}`} layout className="bg-white rounded border border-border overflow-hidden shadow-sm group">
                       <div className="relative h-48">
                         <img src={listing.image || undefined} alt={listing.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

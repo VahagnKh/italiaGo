@@ -46,7 +46,11 @@ import {
   ChevronLeft,
   Award,
   Clock,
-  Send
+  Send,
+  Plane,
+  Ship,
+  CreditCard,
+  Tag
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -361,29 +365,57 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FB]">
       {user && view !== 'home' && view !== 'checkout' ? (
-        <div className="flex h-screen overflow-hidden">
+        <div className="flex h-screen overflow-hidden bg-[#F8F9FB]">
           <Sidebar view={view} setView={setView} user={user} setUser={setUser} setShowAdmin={setShowAdmin} />
           <div className="flex-1 flex flex-col overflow-hidden">
             <TopBar setView={setView} user={user} />
-            <main className="flex-1 overflow-y-auto p-4 sm:p-8">
+            <main className="flex-1 overflow-y-auto px-8">
               {view === 'overview' && <DashboardHome user={user} setView={setView} />}
               {view === 'inbox' && <InboxView user={user} />}
-              {view === 'lessons' && <LessonsView user={user} />}
-              {view === 'tasks' && <TasksView user={user} />}
-              {view === 'groups' && <GroupsView user={user} />}
-              {view === 'friends' && <FriendsView user={user} />}
+              {view === 'notifications' && (
+                <div className="max-w-4xl mx-auto py-10 space-y-6">
+                  <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
+                  <div className="bg-white rounded-[2.5rem] border border-gray-100 divide-y divide-gray-50 overflow-hidden">
+                    {[1, 2, 3].map(i => (
+                      <div key={i} className="p-6 flex gap-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                        <div className="w-12 h-12 bg-[#7C3AED]/10 rounded-2xl flex items-center justify-center text-[#7C3AED] shrink-0">
+                          <Bell size={20} />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-gray-900">New destination added!</p>
+                          <p className="text-xs text-gray-400">Check out the new luxury resort in Amalfi Coast.</p>
+                          <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest pt-1">2 hours ago</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {view === 'favorites' && (
+                <div className="space-y-8 py-10">
+                  <h2 className="text-2xl font-bold text-gray-900">Saved Places</h2>
+                  <ListView items={favorites} type="hotel" title="Favorites" t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter="all" initialPriceFilter="all" initialSearch="" />
+                </div>
+              )}
+              {view === 'profile' && (
+                <div className="max-w-4xl mx-auto py-10">
+                   <DashboardView user={user} t={t} favorites={favorites} onRemoveFavorite={toggleFavorite} refreshUser={refreshUser} addNotification={(m) => console.log(m)} />
+                </div>
+              )}
               {view === 'settings' && <SettingsView user={user} setUser={setUser} />}
               
               {/* Fallback for old views if needed */}
-              {['hotels', 'restaurants', 'experiences', 'tours', 'rentals', 'events', 'taxi'].includes(view) && (
-                <div className="max-w-7xl mx-auto">
-                   <button onClick={() => setView('overview')} className="mb-4 flex items-center gap-2 text-ink/60 hover:text-ink transition-colors">
+              {['hotels', 'restaurants', 'experiences', 'tours', 'rentals', 'events'].includes(view) && (
+                <div className="max-w-7xl mx-auto py-10">
+                   <button onClick={() => setView('overview')} className="mb-6 flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors font-bold text-xs uppercase tracking-widest">
                      <ArrowLeft size={16} /> Back to Dashboard
                    </button>
                    {view === 'hotels' && <ListView items={HOTELS} type="hotel" title={t.hotels} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
                    {view === 'restaurants' && <ListView items={RESTAURANTS} type="restaurant" title={t.restaurants} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
                    {view === 'experiences' && <ListView items={EXPERIENCES} type="experience" title={t.experiences} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
                    {view === 'tours' && <ListView items={TOURS} type="tour" title={t.tours} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+                   {view === 'rentals' && <ListView items={RENTALS} type="rental" title={t.rentals} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
+                   {view === 'events' && <ListView items={EVENTS} type="event" title={t.events} t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
                 </div>
               )}
             </main>
@@ -415,7 +447,6 @@ export default function App() {
           <button onClick={() => { setView('tours'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'tours' ? 'text-ink' : ''}`}>{t.tours}</button>
           <button onClick={() => { setView('rentals'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'rentals' ? 'text-ink' : ''}`}>{t.rentals}</button>
           <button onClick={() => { setView('events'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'events' ? 'text-ink' : ''}`}>{t.events}</button>
-          <button onClick={() => { setView('taxi'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'taxi' ? 'text-ink' : ''}`}>{t.taxi}</button>
           {(user?.role === 'admin' || user?.name === 'Marco Rossi') && (
             <button 
               onClick={() => setShowAdmin(true)} 
@@ -442,7 +473,6 @@ export default function App() {
               <button onClick={() => { setView('tours'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.tours}</button>
               <button onClick={() => { setView('rentals'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.rentals}</button>
               <button onClick={() => { setView('events'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.events}</button>
-              <button onClick={() => { setView('taxi'); setShowMobileMenu(false); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className="text-left text-sm font-bold uppercase tracking-widest text-ink">{t.taxi}</button>
               {(user?.role === 'admin' || user?.name === 'Marco Rossi') && (
                 <button 
                   onClick={() => { setShowAdmin(true); setShowMobileMenu(false); }} 
@@ -683,6 +713,16 @@ export default function App() {
       </nav>
 
       <main className="flex-1 pt-20">
+        {view !== 'home' && (
+          <div className="max-w-7xl mx-auto px-6 pt-8">
+            <button 
+              onClick={() => setView('home')} 
+              className="flex items-center gap-2 text-ink/60 hover:text-ink transition-colors font-bold text-[10px] uppercase tracking-widest"
+            >
+              <ArrowLeft size={14} /> {t.back}
+            </button>
+          </div>
+        )}
         {view === 'home' && <HomeView setView={setView} t={t} lang={lang} setInfoModal={setInfoModal} setInitialFilter={setInitialFilter} addNotification={addNotification} />}
         {view === 'discover' && <ListView items={listings} type="all" title="Discover All" t={t} lang={lang} onAddToBasket={addToBasket} favorites={favorites} onToggleFavorite={toggleFavorite} user={user} initialFilter={initialFilter} initialPriceFilter={initialPriceFilter} initialSearch={initialSearch} />}
         {view === 'checkout' && <CheckoutView setView={setView} basket={basket} basketTotal={basketTotal} onPaymentSuccess={() => { setBasket([]); refreshUser(); }} user={user} />}
@@ -1748,13 +1788,256 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
 
 function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string, setView: (v: any) => void, user: any, setUser: (u: any) => void, setShowAdmin: (s: boolean) => void }) {
   const menuItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'inbox', label: 'Inbox', icon: MessageSquare },
-    { id: 'lessons', label: 'Lesson', icon: BookOpen },
-    { id: 'tasks', label: 'Task', icon: CheckSquare },
-    { id: 'groups', label: 'Group', icon: Users },
+    { id: 'overview', label: 'Destinations', icon: MapIcon },
+    { id: 'inbox', label: 'Messages', icon: Mail },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'favorites', label: 'Saved Places', icon: Heart },
+    { id: 'profile', label: 'Account', icon: User },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
+  return (
+    <div className="hidden lg:flex flex-col w-64 bg-white h-full p-6">
+      <div className="flex items-center gap-3 mb-12 px-4">
+        <div className="w-10 h-10 bg-[#7C3AED] rounded-xl flex items-center justify-center text-white">
+          <Plane size={24} />
+        </div>
+        <span className="text-xl font-bold tracking-tight text-gray-900">Tourvisto</span>
+      </div>
+
+      <div className="space-y-2 flex-1">
+        {menuItems.map(item => (
+          <button
+            key={item.id}
+            onClick={() => setView(item.id)}
+            className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-medium transition-all ${
+              view === item.id ? 'bg-[#7C3AED] text-white shadow-lg shadow-[#7C3AED]/30' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+            }`}
+          >
+            <item.icon size={20} />
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-auto pt-8 space-y-4">
+        <div className="bg-[#7C3AED]/5 rounded-3xl p-6 relative overflow-hidden group cursor-pointer">
+          <div className="relative z-10 space-y-2">
+            <p className="text-sm font-bold text-gray-900">Upgrade to Pro</p>
+            <p className="text-[10px] text-gray-500 leading-relaxed">Get all premium features and unlimited access.</p>
+            <button className="mt-2 text-[10px] font-bold text-[#7C3AED] uppercase tracking-widest">Learn More</button>
+          </div>
+          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#7C3AED]/10 rounded-full group-hover:scale-150 transition-transform duration-500" />
+        </div>
+
+        <div className="space-y-1">
+          {user.role === 'admin' && (
+            <button
+              onClick={() => setShowAdmin(true)}
+              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium text-gold hover:bg-gold/5 transition-all"
+            >
+              <Shield size={20} />
+              Admin Panel
+            </button>
+          )}
+          <button
+            onClick={() => { setUser(null); setView('home'); }}
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-50 transition-all"
+          >
+            <LogOut size={20} />
+            Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ setView, user }: { setView: (v: any) => void, user: any }) {
+  const [query, setQuery] = useState('');
+
+  return (
+    <header className="bg-white px-8 py-6 flex items-center justify-between sticky top-0 z-30">
+      <div className="flex-1 max-w-xl">
+        <h1 className="text-2xl font-bold text-gray-900">Hello, {user.name.split(' ')[0]} 👋</h1>
+        <p className="text-xs text-gray-400 mt-1">Welcome back and explore the world.</p>
+      </div>
+
+      <div className="relative flex-1 max-w-md mx-8">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <input
+          type="text"
+          placeholder="Search destination, hotel..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full bg-gray-50 border-none rounded-2xl pl-12 pr-4 py-3.5 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
+        />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-2xl transition-colors relative">
+          <Bell size={20} />
+          <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+        </button>
+        <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-2xl transition-colors">
+          <Mail size={20} />
+        </button>
+        <div className="h-10 w-px bg-gray-100 mx-2" />
+        <button onClick={() => setView('settings')} className="w-12 h-12 rounded-2xl overflow-hidden bg-gray-100 border-2 border-white shadow-sm">
+          <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function DashboardHome({ user, setView }: { user: any, setView: (v: any) => void }) {
+  const [activeTab, setActiveTab] = useState('popular');
+  const [listings, setListings] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch('/api/listings')
+      .then(res => res.json())
+      .then(data => setListings(Array.isArray(data) ? data : []))
+      .catch(console.error);
+  }, []);
+
+  const hotels = listings.filter(l => l.type === 'hotel');
+  const resorts = listings.filter(l => l.type === 'experience').slice(0, 3);
+
+  return (
+    <div className="space-y-10 pb-10">
+      {/* Hotels Section */}
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h2 className="text-2xl font-bold text-gray-900">Hotels</h2>
+          <div className="flex bg-gray-100 p-1 rounded-2xl">
+            {['popular', 'best-price', 'near-me'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-xl text-xs font-bold capitalize transition-all ${
+                  activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                {tab.replace('-', ' ')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {hotels.slice(0, 3).map((hotel) => (
+            <div key={`hotel-${hotel.id}`} className="group relative h-[400px] rounded-[2.5rem] overflow-hidden cursor-pointer shadow-xl shadow-gray-200/50">
+              <img src={hotel.image} alt={hotel.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              <div className="absolute top-6 right-6">
+                <button className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition-all">
+                  <Heart size={20} />
+                </button>
+              </div>
+              <div className="absolute bottom-8 left-8 right-8 text-white space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest opacity-80">
+                  <MapPin size={12} /> {hotel.location}
+                </div>
+                <h3 className="text-xl font-bold leading-tight">{hotel.title}</h3>
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center gap-1">
+                    <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                    <span className="text-sm font-bold">{hotel.rating || 4.8}</span>
+                  </div>
+                  <div className="text-lg font-bold">
+                    ${hotel.price}<span className="text-xs font-normal opacity-60">/night</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Best Resorts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">Best Resorts</h2>
+            <button className="text-[#7C3AED] text-sm font-bold hover:underline">View All</button>
+          </div>
+          <div className="space-y-4">
+            {resorts.map((resort) => (
+              <div key={`resort-${resort.id}`} className="bg-white p-4 rounded-[2rem] border border-gray-100 flex items-center gap-6 hover:shadow-xl transition-all group cursor-pointer">
+                <div className="w-32 h-32 rounded-3xl overflow-hidden flex-shrink-0">
+                  <img src={resort.image} alt={resort.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <MapPin size={10} /> {resort.location}
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">{resort.title}</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1">
+                      <Star size={14} className="text-yellow-400 fill-yellow-400" />
+                      <span className="text-sm font-bold text-gray-900">{resort.rating || 4.5}</span>
+                    </div>
+                    <div className="text-sm font-bold text-[#7C3AED]">
+                      ${resort.price}<span className="text-xs font-normal text-gray-400">/person</span>
+                    </div>
+                  </div>
+                </div>
+                <button className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 group-hover:bg-[#7C3AED] group-hover:text-white transition-all mr-2">
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Calendar Widget */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold text-gray-900">Available Dates</h2>
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="font-bold text-gray-900">March 2026</h3>
+              <div className="flex gap-2">
+                <button className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors"><ChevronLeft size={16} /></button>
+                <button className="p-2 text-gray-400 hover:bg-gray-50 rounded-lg transition-colors"><ChevronRight size={16} /></button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-2 text-center mb-4">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <span key={`${d}-${i}`} className="text-[10px] font-bold text-gray-400 uppercase">{d}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2 text-center">
+              {Array.from({ length: 31 }).map((_, i) => {
+                const day = i + 1;
+                const isSelected = day === 11;
+                const isRange = day > 11 && day < 16;
+                return (
+                  <button
+                    key={i}
+                    className={`h-8 w-8 rounded-full text-xs font-bold transition-all flex items-center justify-center ${
+                      isSelected ? 'bg-[#7C3AED] text-white' : 
+                      isRange ? 'bg-[#7C3AED]/10 text-[#7C3AED]' :
+                      'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+            <button className="w-full mt-8 bg-gray-900 text-white py-4 rounded-2xl text-sm font-bold hover:bg-black transition-all">
+              Check Availability
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RightPanel({ user }: { user: any }) {
   const [friends, setFriends] = useState<any[]>([]);
 
   useEffect(() => {
@@ -1769,470 +2052,88 @@ function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string,
   }, []);
 
   return (
-    <div className="hidden lg:flex flex-col w-64 bg-white border-r border-gray-100 h-full p-6">
-      <div className="flex items-center gap-3 mb-12">
-        <div className="w-10 h-10 bg-[#7C3AED] rounded-xl flex items-center justify-center text-white">
-          <Sparkles size={24} />
-        </div>
-        <span className="text-xl font-bold tracking-tight text-gray-900 uppercase">Coursue</span>
-      </div>
-
-      <div className="space-y-8 flex-1">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 px-4">Overview</p>
-          <div className="space-y-1">
-            {menuItems.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setView(item.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-                  view === item.id ? 'bg-[#7C3AED]/10 text-[#7C3AED]' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
-                }`}
-              >
-                <item.icon size={18} />
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 px-4">Friends</p>
-          <div className="space-y-4 px-4">
-            {friends.map((friend) => (
-              <div key={friend.id} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-100">
-                  <img src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`} alt={friend.name} className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-900">{friend.name}</p>
-                  <p className="text-[10px] text-gray-400">{friend.role}</p>
-                </div>
-              </div>
-            ))}
-            {friends.length === 0 && (
-              <p className="text-[10px] italic text-gray-400">No friends yet.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="pt-8 border-t border-gray-100 space-y-1">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4 px-4">Settings</p>
-        <button
-          onClick={() => setView('settings')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
-            view === 'settings' ? 'bg-[#7C3AED]/10 text-[#7C3AED]' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
-          }`}
-        >
-          <Settings size={18} />
-          Settings
-        </button>
-        {user.role === 'admin' && (
-          <button
-            onClick={() => setShowAdmin(true)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gold hover:bg-gold/5 transition-all"
-          >
-            <Shield size={18} />
-            Admin Panel
-          </button>
-        )}
-        <button
-          onClick={() => { setUser(null); setView('home'); }}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-50 transition-all"
-        >
-          <LogOut size={18} />
-          Logout
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TopBar({ setView, user }: { setView: (v: any) => void, user: any }) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any>(null);
-
-  useEffect(() => {
-    if (query.length > 2) {
-      const token = localStorage.getItem('token');
-      fetch(`/api/search?q=${query}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => res.json())
-        .then(data => setResults(data));
-    } else {
-      setResults(null);
-    }
-  }, [query]);
-
-  return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-gray-100 px-8 py-4 flex items-center justify-between sticky top-0 z-30">
-      <div className="relative w-full max-w-xl">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-        <input
-          type="text"
-          placeholder="Search your course here...."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full bg-gray-50 border-none rounded-2xl pl-12 pr-12 py-3 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
-        />
-        <button className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-          <Filter size={18} />
-        </button>
-
-        {results && results.courses && results.mentors && (
-          <div className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50">
-            <div className="p-4 space-y-4">
-              {results.courses.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Courses</p>
-                  <div className="space-y-2">
-                    {results.courses.map((c: any) => (
-                      <button key={c.id} className="w-full text-left p-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-lg overflow-hidden">
-                          <img src={c.image} alt={c.title} className="w-full h-full object-cover" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 truncate">{c.title}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {results.mentors.length > 0 && (
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Mentors</p>
-                  <div className="space-y-2">
-                    {results.mentors.map((m: any) => (
-                      <button key={m.id} className="w-full text-left p-2 hover:bg-gray-50 rounded-xl transition-colors flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gray-100 rounded-full overflow-hidden">
-                          <img src={m.avatar} alt={m.name} className="w-full h-full object-cover" />
-                        </div>
-                        <span className="text-sm font-medium text-gray-900">{m.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-4">
-        <button className="p-2 text-gray-400 hover:bg-gray-50 rounded-xl transition-colors relative">
-          <Bell size={20} />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-        </button>
-        <div className="h-8 w-px bg-gray-100 mx-2" />
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-gray-900">{user.name}</p>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest">{user.role}</p>
-          </div>
-          <button onClick={() => setView('settings')} className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 border border-gray-200">
-            <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
-          </button>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function DashboardHome({ user, setView }: { user: any, setView: (v: any) => void }) {
-  const [courses, setCourses] = useState<any[]>([]);
-  const [progress, setProgress] = useState<any[]>([]);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    
-    fetch('/api/courses', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : Promise.reject('Not OK'))
-      .then(data => setCourses(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Failed to fetch courses:', err));
-    
-    fetch('/api/user/progress', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.ok ? res.json() : Promise.reject('Not OK'))
-      .then(data => setProgress(Array.isArray(data) ? data : []))
-      .catch(err => console.error('Failed to fetch progress:', err));
-  }, []);
-
-  return (
-    <div className="space-y-10">
-      {/* Banner */}
-      <div className="relative bg-[#7C3AED] rounded-[2.5rem] p-8 sm:p-12 overflow-hidden text-white">
-        <div className="relative z-10 max-w-lg space-y-6">
-          <p className="text-xs font-bold uppercase tracking-widest opacity-80">Online Course</p>
-          <h1 className="text-3xl sm:text-5xl font-bold leading-tight">Sharpen Your Skills With Professional Online Courses</h1>
-          <button 
-            onClick={() => setView('lessons')}
-            className="bg-white text-[#7C3AED] px-8 py-4 rounded-2xl font-bold text-sm flex items-center gap-2 hover:bg-gray-100 transition-colors"
-          >
-            Join Now <Play size={16} fill="currentColor" />
-          </button>
-        </div>
-        <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
-          <Sparkles className="w-full h-full" />
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="bg-white p-6 rounded-3xl border border-gray-100 flex items-center justify-between group hover:shadow-xl hover:shadow-gray-200/50 transition-all cursor-pointer">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#7C3AED]/10 rounded-2xl flex items-center justify-center text-[#7C3AED]">
-                <Bell size={24} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">2/8 Watched</p>
-                <p className="text-sm font-bold text-gray-900">Product Design</p>
-              </div>
-            </div>
-            <button className="text-gray-300 group-hover:text-gray-600 transition-colors">
-              <MoreVertical size={18} />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Continue Watching */}
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900">Continue Watching</h2>
-          <div className="flex gap-2">
-            <button className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
-              <ChevronLeft size={18} />
-            </button>
-            <button className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) => (
-            <div key={course.id} className="bg-white rounded-[2rem] overflow-hidden border border-gray-100 group hover:shadow-xl transition-all">
-              <div className="h-48 relative overflow-hidden">
-                <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest text-[#7C3AED]">
-                  {course.category}
-                </div>
-              </div>
-              <div className="p-6 space-y-4">
-                <h3 className="font-bold text-gray-900 leading-snug line-clamp-2">{course.title}</h3>
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-gray-100 overflow-hidden">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${course.instructor}`} alt={course.instructor} />
-                  </div>
-                  <span className="text-xs text-gray-400">{course.instructor}</span>
-                </div>
-                <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
-                   <div className="flex-1 mr-4">
-                     <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                       <div className="h-full bg-[#7C3AED]" style={{ width: '45%' }} />
-                     </div>
-                   </div>
-                   <button onClick={() => setView('lessons')} className="text-[#7C3AED] hover:underline text-xs font-bold">Continue</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Mentors Table */}
-      <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
-        <div className="p-8 flex justify-between items-center border-b border-gray-50">
-          <h2 className="text-xl font-bold text-gray-900">Your Mentor</h2>
-          <button className="text-[#7C3AED] text-xs font-bold hover:underline">See All</button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-                <th className="px-8 py-6">Instructor Name & Date</th>
-                <th className="px-8 py-6">Course Type</th>
-                <th className="px-8 py-6">Course Title</th>
-                <th className="px-8 py-6 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {[1, 2].map(i => (
-                <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden">
-                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Mentor${i}`} alt="Mentor" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-gray-900">Prashant Kumar Singh</p>
-                        <p className="text-[10px] text-gray-400">25/2/2023</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="px-3 py-1 bg-[#7C3AED]/10 text-[#7C3AED] rounded-full text-[10px] font-bold uppercase tracking-widest">Frontend</span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <p className="text-sm text-gray-600">Understanding Concept Of React</p>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    <button className="text-[#7C3AED] text-xs font-bold bg-[#7C3AED]/10 px-4 py-2 rounded-xl hover:bg-[#7C3AED] hover:text-white transition-all">Show Details</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RightPanel({ user }: { user: any }) {
-  const [mentors, setMentors] = useState<any[]>([]);
-  const data = [
-    { name: 'Mon', value: 30 },
-    { name: 'Tue', value: 45 },
-    { name: 'Wed', value: 60 },
-    { name: 'Thu', value: 40 },
-    { name: 'Fri', value: 80 },
-    { name: 'Sat', value: 95 },
-    { name: 'Sun', value: 50 },
-  ];
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    fetch('/api/mentors', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setMentors(Array.isArray(data) ? data : []))
-      .catch(console.error);
-  }, []);
-
-  const handleFollow = (id: number) => {
-    const token = localStorage.getItem('token');
-    fetch('/api/mentors/follow', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ mentorId: id })
-    })
-    .then(res => res.json())
-    .then(data => {
-      setMentors(prev => prev.map(m => m.id === id ? { ...m, isFollowed: data.followed } : m));
-    });
-  };
-
-  return (
-    <div className="hidden xl:flex flex-col w-80 bg-white border-l border-gray-100 h-full p-8 overflow-y-auto space-y-10">
+    <div className="hidden xl:flex flex-col w-96 bg-white h-full p-8 overflow-y-auto space-y-10">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold text-gray-900">Your Profile</h2>
-        <button className="text-gray-400 hover:text-gray-600">
-          <MoreVertical size={20} />
+        <h2 className="text-xl font-bold text-gray-900">My Profile</h2>
+        <button className="p-2 text-gray-400 hover:bg-gray-50 rounded-xl transition-colors">
+          <Settings size={20} />
         </button>
       </div>
 
       <div className="text-center space-y-4">
         <div className="relative inline-block">
-          <div className="w-24 h-24 rounded-full p-1 border-2 border-[#7C3AED] border-t-transparent animate-spin-slow">
-            <div className="w-full h-full rounded-full overflow-hidden border-2 border-white">
-              <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
-            </div>
+          <div className="w-24 h-24 rounded-[2rem] overflow-hidden border-4 border-white shadow-xl">
+            <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
           </div>
-          <div className="absolute bottom-0 right-0 w-6 h-6 bg-emerald-500 border-4 border-white rounded-full" />
+          <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-[#7C3AED] border-4 border-white rounded-xl flex items-center justify-center text-white">
+            <Camera size={14} />
+          </div>
         </div>
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Good Morning {user.name.split(' ')[0]}</h3>
-          <p className="text-xs text-gray-400 mt-1">Continue Your Journey And Achieve Your Target</p>
+          <h3 className="text-xl font-bold text-gray-900">{user.name}</h3>
+          <p className="text-xs text-gray-400 mt-1">Traveler & Explorer</p>
         </div>
       </div>
 
-      <div className="flex justify-center gap-4">
-        <button className="w-10 h-10 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
-          <Bell size={18} />
-        </button>
-        <button className="w-10 h-10 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
-          <ShoppingBag size={18} />
-        </button>
-        <button className="w-10 h-10 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
-          <Mail size={18} />
-        </button>
+      {/* Transportation Icons */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { icon: Plane, label: 'Flight', color: 'bg-blue-50 text-blue-500' },
+          { icon: Hotel, label: 'Hotel', color: 'bg-orange-50 text-orange-500' },
+          { icon: Car, label: 'Car', color: 'bg-purple-50 text-purple-500' },
+          { icon: Ship, label: 'Ship', color: 'bg-emerald-50 text-emerald-500' },
+        ].map((item, i) => (
+          <div key={i} className="space-y-2 text-center">
+            <div className={`w-full aspect-square ${item.color} rounded-2xl flex items-center justify-center transition-transform hover:scale-110 cursor-pointer`}>
+              <item.icon size={20} />
+            </div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.label}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="space-y-4">
-        <div className="h-40 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data}>
-              <Tooltip 
-                cursor={{ fill: '#F3F4F6' }}
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-white p-2 rounded-lg shadow-xl border border-gray-100 text-[10px] font-bold">
-                        {payload[0].value}%
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={index === 5 ? '#7C3AED' : '#E5E7EB'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">
-          <span>Learning Progress</span>
-          <span className="text-[#7C3AED]">75%</span>
-        </div>
-      </div>
-
+      {/* Friends List */}
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-lg font-bold text-gray-900">Your Mentor</h2>
-          <button className="w-6 h-6 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:bg-gray-50 transition-colors">
-            <ArrowRight size={14} />
-          </button>
+          <h2 className="text-lg font-bold text-gray-900">Travel Friends</h2>
+          <button className="text-[#7C3AED] text-xs font-bold hover:underline">Add New</button>
         </div>
-        <div className="space-y-4">
-          {mentors.map((mentor) => (
-            <div key={mentor.id} className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100">
-                  <img src={mentor.avatar} alt={mentor.name} className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-gray-900">{mentor.name}</p>
-                  <p className="text-[10px] text-gray-400">{mentor.role}</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => handleFollow(mentor.id)}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-bold transition-all ${
-                  mentor.isFollowed ? 'bg-gray-100 text-gray-400' : 'bg-[#7C3AED] text-white hover:bg-[#6D28D9]'
-                }`}
-              >
-                {mentor.isFollowed ? 'Followed' : 'Follow'}
-              </button>
+        <div className="flex -space-x-3 overflow-hidden">
+          {friends.map((friend, i) => (
+            <div key={friend.id} className="inline-block h-10 w-10 rounded-full ring-4 ring-white overflow-hidden bg-gray-100">
+              <img src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`} alt={friend.name} className="w-full h-full object-cover" />
             </div>
           ))}
+          <button className="flex items-center justify-center h-10 w-10 rounded-full ring-4 ring-white bg-gray-100 text-gray-400 text-xs font-bold hover:bg-gray-200 transition-colors">
+            +12
+          </button>
         </div>
-        <button className="w-full py-3 bg-[#7C3AED]/10 text-[#7C3AED] rounded-2xl text-xs font-bold hover:bg-[#7C3AED] hover:text-white transition-all">
-          See All
-        </button>
+      </div>
+
+      {/* Credit Card Widget */}
+      <div className="bg-gray-900 rounded-[2.5rem] p-8 text-white space-y-8 relative overflow-hidden">
+        <div className="relative z-10 flex justify-between items-start">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Total Balance</p>
+            <p className="text-2xl font-bold">$12,850.00</p>
+          </div>
+          <div className="w-12 h-8 bg-white/10 rounded-lg backdrop-blur-md flex items-center justify-center">
+            <CreditCard size={20} />
+          </div>
+        </div>
+        <div className="relative z-10 flex justify-between items-end">
+          <div className="space-y-1">
+            <p className="text-sm font-medium tracking-widest">**** **** **** 4580</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Exp: 12/26</p>
+          </div>
+          <div className="flex -space-x-2">
+            <div className="w-6 h-6 rounded-full bg-red-500/80" />
+            <div className="w-6 h-6 rounded-full bg-yellow-500/80" />
+          </div>
+        </div>
+        {/* Decorative circles */}
+        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/5 rounded-full" />
+        <div className="absolute -left-10 -top-10 w-20 h-20 bg-white/5 rounded-full" />
       </div>
     </div>
   );
@@ -2319,271 +2220,6 @@ function InboxView({ user }: { user: any }) {
   );
 }
 
-function LessonsView({ user }: { user: any }) {
-  const [courses, setCourses] = useState<any[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<any>(null);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    fetch('/api/courses', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setCourses(Array.isArray(data) ? data : []));
-  }, []);
-
-  const fetchCourseDetails = (id: number) => {
-    const token = localStorage.getItem('token');
-    fetch(`/api/courses/${id}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setSelectedCourse(data));
-  };
-
-  if (selectedCourse) {
-    return (
-      <div className="space-y-8">
-        <button onClick={() => setSelectedCourse(null)} className="flex items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors font-bold text-sm">
-          <ArrowLeft size={18} /> Back to Courses
-        </button>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden shadow-2xl relative group">
-              <iframe
-                src={selectedCourse.lessons[0]?.video_url}
-                className="w-full h-full"
-                allowFullScreen
-              />
-            </div>
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{selectedCourse.title}</h1>
-                  <p className="text-gray-400 mt-1">{selectedCourse.instructor}</p>
-                </div>
-                <span className="px-4 py-2 bg-[#7C3AED]/10 text-[#7C3AED] rounded-full text-xs font-bold uppercase tracking-widest">
-                  {selectedCourse.category}
-                </span>
-              </div>
-              <p className="text-gray-600 leading-relaxed">{selectedCourse.description}</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm flex flex-col h-fit">
-            <div className="p-6 border-b border-gray-50">
-              <h3 className="font-bold text-gray-900">Course Content</h3>
-              <p className="text-xs text-gray-400 mt-1">{selectedCourse.lessons.length} Lessons • 2h 45m</p>
-            </div>
-            <div className="divide-y divide-gray-50 overflow-y-auto max-h-[600px]">
-              {selectedCourse.lessons.map((lesson: any, i: number) => (
-                <button key={i} className="w-full p-6 flex items-center gap-4 hover:bg-gray-50 transition-colors text-left group">
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
-                    {i === 0 ? <Play size={18} fill="currentColor" /> : <Lock size={18} />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-gray-900">{lesson.title}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{lesson.duration}</p>
-                  </div>
-                  {i === 0 && <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">Playing</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900">My Lessons</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        {courses.map((course) => (
-          <div key={course.id} className="bg-white rounded-[2.5rem] overflow-hidden border border-gray-100 group hover:shadow-2xl transition-all flex flex-col">
-            <div className="h-56 relative overflow-hidden">
-              <img src={course.image} alt={course.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                <button onClick={() => fetchCourseDetails(course.id)} className="w-16 h-16 bg-white text-[#7C3AED] rounded-full flex items-center justify-center shadow-2xl scale-75 group-hover:scale-100 transition-all">
-                  <Play size={32} fill="currentColor" />
-                </button>
-              </div>
-            </div>
-            <div className="p-8 space-y-6 flex-1 flex flex-col">
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-[#7C3AED] uppercase tracking-widest">{course.category}</span>
-                <h3 className="text-lg font-bold text-gray-900 leading-tight">{course.title}</h3>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden">
-                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${course.instructor}`} alt={course.instructor} />
-                </div>
-                <span className="text-xs text-gray-400">{course.instructor}</span>
-              </div>
-              <div className="pt-6 border-t border-gray-50 mt-auto">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Progress</span>
-                  <span className="text-[10px] font-bold text-[#7C3AED]">45%</span>
-                </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#7C3AED]" style={{ width: '45%' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TasksView({ user }: { user: any }) {
-  const [tasks, setTasks] = useState<any[]>([]);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    fetch('/api/tasks', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setTasks(Array.isArray(data) ? data : []));
-  }, []);
-
-  return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Assignments</h2>
-        <div className="flex gap-2">
-          <button className="px-4 py-2 bg-white border border-gray-100 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all">All Tasks</button>
-          <button className="px-4 py-2 bg-[#7C3AED] rounded-xl text-xs font-bold text-white shadow-lg shadow-[#7C3AED]/20">Pending</button>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 gap-6">
-        {tasks.map((task) => (
-          <div key={task.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-8 group hover:shadow-xl transition-all">
-            <div className="flex items-center gap-6">
-              <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-[#7C3AED] group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
-                <CheckSquare size={32} />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-bold text-gray-900">{task.title}</h3>
-                <p className="text-sm text-gray-400">{task.course_title}</p>
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                    <Clock size={12} /> Due: {new Date(task.due_date).toLocaleDateString()}
-                  </span>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                    task.status === 'submitted' ? 'bg-emerald-50 text-emerald-500' : 'bg-amber-50 text-amber-500'
-                  }`}>
-                    {task.status || 'Pending'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <button className="flex-1 md:flex-none px-8 py-4 bg-gray-50 text-gray-600 rounded-2xl text-xs font-bold hover:bg-gray-100 transition-all">View Details</button>
-              <button className="flex-1 md:flex-none px-8 py-4 bg-[#7C3AED] text-white rounded-2xl text-xs font-bold hover:bg-[#6D28D9] transition-all shadow-lg shadow-[#7C3AED]/20">Submit Task</button>
-            </div>
-          </div>
-        ))}
-        {tasks.length === 0 && (
-          <div className="py-20 text-center space-y-4">
-            <CheckSquare size={64} className="mx-auto text-gray-100" />
-            <p className="text-gray-400 italic">No assignments found for your courses.</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function GroupsView({ user }: { user: any }) {
-  return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900">Learning Groups</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 space-y-6 group hover:shadow-xl transition-all">
-            <div className="flex justify-between items-start">
-              <div className="w-16 h-16 bg-[#7C3AED]/10 rounded-[1.5rem] flex items-center justify-center text-[#7C3AED]">
-                <Users size={32} />
-              </div>
-              <button className="text-gray-300 hover:text-gray-600">
-                <MoreVertical size={20} />
-              </button>
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-bold text-gray-900">React Enthusiasts</h3>
-              <p className="text-sm text-gray-400">A group for sharing React tips and tricks.</p>
-            </div>
-            <div className="flex -space-x-3">
-              {[1, 2, 3, 4].map(j => (
-                <div key={j} className="w-10 h-10 rounded-full border-4 border-white overflow-hidden bg-gray-100">
-                  <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=User${j}`} alt="Member" />
-                </div>
-              ))}
-              <div className="w-10 h-10 rounded-full border-4 border-white bg-gray-50 flex items-center justify-center text-[10px] font-bold text-gray-400">
-                +12
-              </div>
-            </div>
-            <button className="w-full py-4 bg-gray-50 text-gray-600 rounded-2xl text-xs font-bold hover:bg-[#7C3AED] hover:text-white transition-all">Join Group</button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FriendsView({ user }: { user: any }) {
-  const [friends, setFriends] = useState<any[]>([]);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    fetch('/api/friends', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => setFriends(Array.isArray(data) ? data : []));
-  }, []);
-
-  return (
-    <div className="space-y-8">
-      <h2 className="text-2xl font-bold text-gray-900">My Friends</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {friends.map((friend) => (
-          <div key={friend.id} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 text-center space-y-6 group hover:shadow-xl transition-all">
-            <div className="relative inline-block">
-              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-50 shadow-lg">
-                <img src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.name}`} alt={friend.name} className="w-full h-full object-cover" />
-              </div>
-              <div className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full" />
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-900">{friend.name}</h3>
-              <p className="text-xs text-gray-400 mt-1">{friend.role}</p>
-            </div>
-            <div className="flex gap-2">
-              <button className="flex-1 p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-[#7C3AED]/10 hover:text-[#7C3AED] transition-all">
-                <MessageSquare size={18} className="mx-auto" />
-              </button>
-              <button className="flex-1 p-3 bg-gray-50 text-gray-400 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all">
-                <Trash2 size={18} className="mx-auto" />
-              </button>
-            </div>
-          </div>
-        ))}
-        <button className="bg-white p-8 rounded-[2.5rem] border-2 border-dashed border-gray-100 text-center space-y-4 hover:border-[#7C3AED] hover:bg-[#7C3AED]/5 transition-all group">
-          <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto text-gray-300 group-hover:bg-[#7C3AED] group-hover:text-white transition-all">
-            <Users size={32} />
-          </div>
-          <p className="text-sm font-bold text-gray-400 group-hover:text-[#7C3AED]">Add New Friend</p>
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function SettingsView({ user, setUser }: { user: any, setUser: (u: any) => void }) {
   const [name, setName] = useState(user.name);
@@ -3034,14 +2670,14 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
     setSearch(initialSearch);
   }, [initialSearch]);
 
-  const locations = ['all', ...Array.from(new Set(items.map(item => item.location)))];
+  const locations = Array.from(new Set(['all', ...items.map(item => item.location), filter].filter(Boolean)));
   const priceLevels = ['all', 'low', 'medium', 'high'];
   const starLevels = ['all', 3, 4, 5];
 
   const filteredItems = items.filter(item => {
     const locMatch = filter === 'all' || (item.location || '') === filter;
     const priceMatch = priceFilter === 'all' || (item.price_level || '') === priceFilter;
-    const starMatch = starFilter === 'all' || (item.stars || 0) === starFilter;
+    const starMatch = starFilter === 'all' || (item.stars || 0) >= (starFilter as number);
     const searchMatch = !search || 
       (item.name || '').toLowerCase().includes(search.toLowerCase()) || 
       (item.description || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -3125,7 +2761,7 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
         {filteredItems.length > 0 ? (
           filteredItems.map((item) => (
             <motion.div 
-              key={item.id}
+              key={`${item.type}-${item.id}`}
               whileHover={{ y: -10 }}
               className="luxury-card group cursor-pointer"
             >
@@ -3141,7 +2777,7 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
                 <button 
                   onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
                   className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10 ${
-                    favorites.some(f => f.id === item.id) 
+                    favorites.some(f => f.id === item.id && f.type === item.type) 
                       ? 'bg-red-500 text-white' 
                       : 'bg-card/90 backdrop-blur text-ink/40 hover:text-red-500'
                   }`}
@@ -3172,18 +2808,24 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
             </motion.div>
           ))
         ) : (
-          <div className="col-span-full py-20 text-center space-y-4">
-            <div className="w-20 h-20 bg-paper rounded-full flex items-center justify-center mx-auto text-ink/20">
-              <Search size={40} />
+          <div className="col-span-full py-20 text-center space-y-8">
+            <div className="space-y-4">
+              <div className="w-20 h-20 bg-paper rounded-full flex items-center justify-center mx-auto text-ink/20">
+                <Search size={40} />
+              </div>
+              <h3 className="text-2xl font-display italic text-ink">No results found</h3>
+              <p className="text-ink/60 max-w-md mx-auto">We couldn't find any {type === 'all' ? 'items' : type + 's'} matching your current filters. Try adjusting your search or explore our recommendations below.</p>
+              <button 
+                onClick={() => { setFilter('all'); setPriceFilter('all'); setStarFilter('all'); setSearch(''); }}
+                className="text-gold font-bold uppercase tracking-widest text-xs hover:underline"
+              >
+                Clear all filters
+              </button>
             </div>
-            <h3 className="text-2xl font-display italic text-ink">No results found</h3>
-            <p className="text-ink/60 max-w-md mx-auto">Try adjusting your filters or search terms to find what you're looking for.</p>
-            <button 
-              onClick={() => { setFilter('all'); setPriceFilter('all'); setStarFilter('all'); setSearch(''); }}
-              className="text-gold font-bold uppercase tracking-widest text-xs hover:underline"
-            >
-              Clear all filters
-            </button>
+
+            <div className="pt-12 border-t border-border">
+              <Suggestions t={t} />
+            </div>
           </div>
         )}
       </div>
@@ -3238,34 +2880,72 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
                   
                   {selectedItem.amenities && (
                     <div className="flex flex-wrap gap-2">
-                      {selectedItem.amenities.map((a: string) => (
+                      {(typeof selectedItem.amenities === 'string' ? selectedItem.amenities.split(',') : selectedItem.amenities).map((a: string) => (
                         <span key={a} className="px-3 py-1 bg-paper rounded-full text-[10px] font-bold uppercase tracking-widest text-ink/40">
-                          <TranslatedText text={a} lang={lang} />
+                          <TranslatedText text={a.trim()} lang={lang} />
                         </span>
                       ))}
                     </div>
                   )}
 
-                  {selectedItem.highlights && (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedItem.highlights.map((h: string) => (
-                        <span key={h} className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 rounded-full text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
-                          <TranslatedText text={h} lang={lang} />
-                        </span>
-                      ))}
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
+                    {selectedItem.address && (
+                      <div className="space-y-1">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Address</h4>
+                        <p className="text-xs text-ink/80">{selectedItem.address}</p>
+                        {selectedItem.map_url && (
+                          <a href={selectedItem.map_url} target="_blank" rel="noopener noreferrer" className="text-[10px] text-gold font-bold hover:underline flex items-center gap-1">
+                            <MapPin size={10} /> View on Map
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {selectedItem.availability && (
+                      <div className="space-y-1">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Availability</h4>
+                        <p className="text-xs text-ink/80">{selectedItem.availability}</p>
+                      </div>
+                    )}
+                    {selectedItem.duration && (
+                      <div className="space-y-1">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Duration</h4>
+                        <p className="text-xs text-ink/80">{selectedItem.duration}</p>
+                      </div>
+                    )}
+                    {selectedItem.hours && (
+                      <div className="space-y-1">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Hours</h4>
+                        <p className="text-xs text-ink/80">{selectedItem.hours}</p>
+                      </div>
+                    )}
+                    {selectedItem.cuisine_type && (
+                      <div className="space-y-1">
+                        <h4 className="text-[10px] font-bold uppercase tracking-widest text-ink/40">Cuisine</h4>
+                        <p className="text-xs text-ink/80">{selectedItem.cuisine_type}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {selectedItem.promotions && (
+                    <div className="p-4 bg-gold/10 border border-gold/20 rounded-2xl flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gold rounded-full flex items-center justify-center text-white">
+                        <Tag size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-gold uppercase tracking-widest">Promotion</h4>
+                        <p className="text-sm text-ink/80 font-medium">{selectedItem.promotions}</p>
+                      </div>
                     </div>
                   )}
                   
                   <div className="pt-4 border-t border-border">
                     <h4 className="text-xs font-bold uppercase tracking-widest text-ink/40 mb-2">Heritage & Info</h4>
                     <p className="text-sm text-ink/60 italic leading-relaxed">
-                      <TranslatedText text={selectedItem.history || selectedItem.info || ''} lang={lang} />
+                      <TranslatedText text={selectedItem.details || selectedItem.history || selectedItem.info || ''} lang={lang} />
                     </p>
                   </div>
 
-                  {(type === 'hotel' || type === 'restaurant') && (
-                    <ReviewsSection itemId={selectedItem.id} type={selectedItem.type} t={t} lang={lang} user={user} />
-                  )}
+                  <ReviewsSection itemId={selectedItem.id} type={selectedItem.type} t={t} lang={lang} user={user} />
 
                   <div className="pt-6">
                     <button 
@@ -3309,7 +2989,7 @@ function Suggestions({ t }: { t: any }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {suggestions.map(item => (
           <motion.div 
-            key={item.id}
+            key={`${item.type}-${item.id}`}
             whileHover={{ y: -5 }}
             className="bg-card rounded-2xl overflow-hidden border border-border shadow-sm group cursor-pointer"
           >

@@ -56,7 +56,14 @@ db.exec(`
     image TEXT,
     rating REAL DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
+    category TEXT,
+    price_level TEXT,
     details TEXT,
+    address TEXT,
+    map_url TEXT,
+    promotions TEXT,
+    availability TEXT,
+    duration TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -69,7 +76,16 @@ db.exec(`
     image TEXT,
     rating REAL DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
+    category TEXT,
+    price_level TEXT,
     details TEXT,
+    address TEXT,
+    map_url TEXT,
+    promotions TEXT,
+    availability TEXT,
+    cuisine_type TEXT,
+    hours TEXT,
+    capacity INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -82,7 +98,14 @@ db.exec(`
     image TEXT,
     rating REAL DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
+    category TEXT,
+    price_level TEXT,
     details TEXT,
+    address TEXT,
+    map_url TEXT,
+    promotions TEXT,
+    availability TEXT,
+    amenities TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -95,7 +118,14 @@ db.exec(`
     image TEXT,
     rating REAL DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
+    category TEXT,
+    price_level TEXT,
     details TEXT,
+    address TEXT,
+    map_url TEXT,
+    promotions TEXT,
+    availability TEXT,
+    duration TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -108,7 +138,13 @@ db.exec(`
     image TEXT,
     rating REAL DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
+    category TEXT,
+    price_level TEXT,
     details TEXT,
+    address TEXT,
+    map_url TEXT,
+    promotions TEXT,
+    availability TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -121,7 +157,13 @@ db.exec(`
     image TEXT,
     rating REAL DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
+    category TEXT,
+    price_level TEXT,
     details TEXT,
+    address TEXT,
+    map_url TEXT,
+    promotions TEXT,
+    availability TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -134,6 +176,8 @@ db.exec(`
     image TEXT,
     rating REAL DEFAULT 0,
     reviews_count INTEGER DEFAULT 0,
+    category TEXT,
+    price_level TEXT,
     details TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -269,6 +313,22 @@ try {
   if (!bookingColumnNames.includes('listing_type')) {
     db.prepare("ALTER TABLE bookings ADD COLUMN listing_type TEXT").run();
   }
+
+  // Category and Price Level migration
+  const tables = ['tours', 'restaurants', 'hotels', 'experiences', 'rentals', 'events', 'taxi_services'];
+  tables.forEach(table => {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+    const colNames = cols.map((c: any) => c.name);
+    if (!colNames.includes('category')) {
+      db.prepare(`ALTER TABLE ${table} ADD COLUMN category TEXT`).run();
+    }
+    if (!colNames.includes('price_level')) {
+      db.prepare(`ALTER TABLE ${table} ADD COLUMN price_level TEXT`).run();
+    }
+    // Set default values for existing rows
+    db.prepare(`UPDATE ${table} SET category = 'General' WHERE category IS NULL`).run();
+    db.prepare(`UPDATE ${table} SET price_level = '€€' WHERE price_level IS NULL`).run();
+  });
 } catch (error) {
   console.error("Migration Error:", error);
 }
@@ -384,16 +444,25 @@ async function startServer() {
   const authenticateToken = (req: any, res: any, next: any) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
+    if (!token) {
+      console.warn(`Auth failed: No token for ${req.path}`);
+      return res.sendStatus(401);
+    }
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-      if (err) return res.sendStatus(403);
+      if (err) {
+        console.error(`Auth failed: Invalid token for ${req.path}`, err);
+        return res.sendStatus(403);
+      }
       req.user = user;
       next();
     });
   };
 
   const isAdminMiddleware = (req: any, res: any, next: any) => {
-    if (req.user?.role !== 'admin') return res.status(403).json({ error: "Admin access required" });
+    if (req.user?.role !== 'admin') {
+      console.warn(`Admin access denied for user ${req.user?.id} (${req.user?.role}) at ${req.path}`);
+      return res.status(403).json({ error: "Admin access required" });
+    }
     next();
   };
 
@@ -433,78 +502,78 @@ async function startServer() {
     const tourCount = db.prepare("SELECT COUNT(*) as count FROM tours").get().count;
     if (tourCount === 0) {
       const tours = [
-        { title: 'Colosseum Private Tour', description: 'Skip-the-line access to the heart of Rome.', price: 150, location: 'Rome', image: 'https://picsum.photos/seed/rome/800/600', details: 'Includes access to the arena floor and underground chambers.' },
-        { title: 'Venice Gondola Ride', description: 'Romantic sunset ride through the canals.', price: 120, location: 'Venice', image: 'https://picsum.photos/seed/venice/800/600', details: 'Private gondola for up to 4 people.' },
-        { title: 'Tuscan Wine Tasting', description: 'Explore the vineyards of Chianti.', price: 200, location: 'Florence', image: 'https://picsum.photos/seed/tuscany/800/600', details: 'Visit 3 historic wineries with lunch included.' }
+        { title: 'Colosseum Private Tour', description: 'Skip-the-line access to the heart of Rome.', price: 150, location: 'Rome', image: 'https://picsum.photos/seed/rome/800/600', details: 'Includes access to the arena floor and underground chambers.', category: 'History', price_level: 'high', rating: 5, reviews_count: 120, address: 'Piazza del Colosseo, 1, 00184 Roma RM', map_url: 'https://goo.gl/maps/colosseum', promotions: '10% off for groups of 4+', availability: 'Daily 9:00 - 17:00', duration: '3 hours' },
+        { title: 'Venice Gondola Ride', description: 'Romantic sunset ride through the canals.', price: 120, location: 'Venice', image: 'https://picsum.photos/seed/venice/800/600', details: 'Private gondola for up to 4 people.', category: 'Romantic', price_level: 'medium', rating: 4.5, reviews_count: 85, address: 'Sestiere di S. Marco, 30124 Venezia VE', map_url: 'https://goo.gl/maps/venice-gondola', promotions: 'Free prosecco included', availability: 'Daily 10:00 - 20:00', duration: '45 minutes' },
+        { title: 'Tuscan Wine Tasting', description: 'Explore the vineyards of Chianti.', price: 200, location: 'Florence', image: 'https://picsum.photos/seed/tuscany/800/600', details: 'Visit 3 historic wineries with lunch included.', category: 'Food & Wine', price_level: 'high', rating: 4.8, reviews_count: 64, address: 'Strada in Chianti, 50022 Greve in Chianti FI', map_url: 'https://goo.gl/maps/chianti', promotions: 'Bottle of wine included', availability: 'Tue-Sun 10:00 - 18:00', duration: '6 hours' }
       ];
-      const insert = db.prepare("INSERT INTO tours (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
-      tours.forEach(t => insert.run(t.title, t.description, t.price, t.location, t.image, t.details));
+      const insert = db.prepare("INSERT INTO tours (title, description, price, location, image, details, category, price_level, rating, reviews_count, address, map_url, promotions, availability, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      tours.forEach(t => insert.run(t.title, t.description, t.price, t.location, t.image, t.details, t.category, t.price_level, t.rating, t.reviews_count, t.address, t.map_url, t.promotions, t.availability, t.duration));
     }
 
     // Restaurants
     const restCount = db.prepare("SELECT COUNT(*) as count FROM restaurants").get().count;
     if (restCount === 0) {
       const rests = [
-        { title: 'Osteria Francescana', description: 'World-renowned fine dining.', price: 350, location: 'Modena', image: 'https://picsum.photos/seed/osteria/800/600', details: '3 Michelin stars. Booking required 6 months in advance.' },
-        { title: 'La Pergola', description: 'Panoramic views of Rome.', price: 250, location: 'Rome', image: 'https://picsum.photos/seed/pergola/800/600', details: 'The only 3-star Michelin restaurant in Rome.' }
+        { title: 'Osteria Francescana', description: 'World-renowned fine dining.', price: 350, location: 'Modena', image: 'https://picsum.photos/seed/osteria/800/600', details: '3 Michelin stars. Booking required 6 months in advance.', category: 'Fine Dining', price_level: 'high', rating: 5, reviews_count: 450, address: 'Via Stella, 22, 41121 Modena MO', map_url: 'https://goo.gl/maps/osteria', promotions: 'Chef special tasting menu', availability: 'Tue-Sat 12:30-14:00, 20:00-21:30', cuisine_type: 'Modern Italian', hours: '12:30 - 21:30', capacity: 30 },
+        { title: 'La Pergola', description: 'Panoramic views of Rome.', price: 250, location: 'Rome', image: 'https://picsum.photos/seed/pergola/800/600', details: 'The only 3-star Michelin restaurant in Rome.', category: 'Fine Dining', price_level: 'high', rating: 4.9, reviews_count: 320, address: 'Via Alberto Cadlolo, 101, 00136 Roma RM', map_url: 'https://goo.gl/maps/lapergola', promotions: 'Wine pairing included', availability: 'Tue-Sat 19:30-23:30', cuisine_type: 'Gourmet Italian', hours: '19:30 - 23:30', capacity: 50 }
       ];
-      const insert = db.prepare("INSERT INTO restaurants (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
-      rests.forEach(r => insert.run(r.title, r.description, r.price, r.location, r.image, r.details));
+      const insert = db.prepare("INSERT INTO restaurants (title, description, price, location, image, details, category, price_level, rating, reviews_count, address, map_url, promotions, availability, cuisine_type, hours, capacity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      rests.forEach(r => insert.run(r.title, r.description, r.price, r.location, r.image, r.details, r.category, r.price_level, r.rating, r.reviews_count, r.address, r.map_url, r.promotions, r.availability, r.cuisine_type, r.hours, r.capacity));
     }
 
     // Hotels
     const hotelCount = db.prepare("SELECT COUNT(*) as count FROM hotels").get().count;
     if (hotelCount === 0) {
       const hotels = [
-        { title: 'Hotel Danieli', description: 'Historic luxury on the Grand Canal.', price: 800, location: 'Venice', image: 'https://picsum.photos/seed/danieli/800/600', details: 'A legendary hotel housed in a 14th-century palace.' },
-        { title: 'Hotel Hassler', description: 'Top of the Spanish Steps.', price: 900, location: 'Rome', image: 'https://picsum.photos/seed/hassler/800/600', details: 'Iconic luxury with the best views of the Eternal City.' }
+        { title: 'Hotel Danieli', description: 'Historic luxury on the Grand Canal.', price: 800, location: 'Venice', image: 'https://picsum.photos/seed/danieli/800/600', details: 'A legendary hotel housed in a 14th-century palace.', category: 'Luxury', price_level: 'high', rating: 5, reviews_count: 850, address: 'Riva degli Schiavoni, 4196, 30122 Venezia VE', map_url: 'https://goo.gl/maps/danieli', promotions: 'Breakfast included', availability: 'Year-round', amenities: 'Spa, Rooftop Terrace, Private Dock' },
+        { title: 'Hotel Hassler', description: 'Top of the Spanish Steps.', price: 900, location: 'Rome', image: 'https://picsum.photos/seed/hassler/800/600', details: 'Iconic luxury with the best views of the Eternal City.', category: 'Luxury', price_level: 'high', rating: 4.9, reviews_count: 540, address: 'Piazza della Trinità dei Monti, 6, 00187 Roma RM', map_url: 'https://goo.gl/maps/hassler', promotions: 'Complimentary boat tour', availability: 'Year-round', amenities: 'Michelin Restaurant, Spa, Terrace' }
       ];
-      const insert = db.prepare("INSERT INTO hotels (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
-      hotels.forEach(h => insert.run(h.title, h.description, h.price, h.location, h.image, h.details));
+      const insert = db.prepare("INSERT INTO hotels (title, description, price, location, image, details, category, price_level, rating, reviews_count, address, map_url, promotions, availability, amenities) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      hotels.forEach(h => insert.run(h.title, h.description, h.price, h.location, h.image, h.details, h.category, h.price_level, h.rating, h.reviews_count, h.address, h.map_url, h.promotions, h.availability, h.amenities));
     }
 
     // Taxi
     const taxiCount = db.prepare("SELECT COUNT(*) as count FROM taxi_services").get().count;
     if (taxiCount === 0) {
       const taxis = [
-        { title: 'Rome Elite Transfers', description: 'Luxury Mercedes S-Class.', price: 80, location: 'Rome', image: 'https://picsum.photos/seed/taxi1/800/600', details: 'Professional chauffeurs for airport transfers.' },
-        { title: 'Milan Fashion Limo', description: 'Sleek black limousine.', price: 150, location: 'Milan', image: 'https://picsum.photos/seed/taxi2/800/600', details: 'The most stylish way to arrive at Milan Fashion Week.' }
+        { title: 'Rome Elite Transfers', description: 'Luxury Mercedes S-Class.', price: 80, location: 'Rome', image: 'https://picsum.photos/seed/taxi1/800/600', details: 'Professional chauffeurs for airport transfers.', category: 'Transfer', price_level: 'medium', rating: 4.8, reviews_count: 150, address: 'Via di Priscilla, 101, 00199 Roma RM', map_url: 'https://goo.gl/maps/rome-taxi', promotions: 'Free water and Wi-Fi', availability: '24/7' },
+        { title: 'Milan Fashion Limo', description: 'Sleek black limousine.', price: 150, location: 'Milan', image: 'https://picsum.photos/seed/taxi2/800/600', details: 'The most stylish way to arrive at Milan Fashion Week.', category: 'Luxury', price_level: 'high', rating: 4.9, reviews_count: 85, address: 'Via Montenapoleone, 1, 20121 Milano MI', map_url: 'https://goo.gl/maps/milan-taxi', promotions: 'Champagne on board', availability: 'By appointment' }
       ];
-      const insert = db.prepare("INSERT INTO taxi_services (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
-      taxis.forEach(t => insert.run(t.title, t.description, t.price, t.location, t.image, t.details));
+      const insert = db.prepare("INSERT INTO taxi_services (title, description, price, location, image, details, category, price_level, rating, reviews_count, address, map_url, promotions, availability) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      taxis.forEach(t => insert.run(t.title, t.description, t.price, t.location, t.image, t.details, t.category, t.price_level, t.rating, t.reviews_count, t.address, t.map_url, t.promotions, t.availability));
     }
 
     // Experiences
     const expCount = db.prepare("SELECT COUNT(*) as count FROM experiences").get().count;
     if (expCount === 0) {
       const exps = [
-        { title: 'Cooking Class in Trastevere', description: 'Learn to make pasta from scratch.', price: 85, location: 'Rome', image: 'https://picsum.photos/seed/cooking/800/600', details: '3-hour workshop with a local chef.' },
-        { title: 'Hot Air Balloon over Tuscany', description: 'Breathtaking views of the rolling hills.', price: 250, location: 'Siena', image: 'https://picsum.photos/seed/balloon/800/600', details: 'Includes champagne breakfast upon landing.' }
+        { title: 'Cooking Class in Trastevere', description: 'Learn to make pasta from scratch.', price: 85, location: 'Rome', image: 'https://picsum.photos/seed/cooking/800/600', details: '3-hour workshop with a local chef.', category: 'Workshop', price_level: 'medium', rating: 4.7, reviews_count: 210, address: 'Via della Lungaretta, 121, 00153 Roma RM', map_url: 'https://goo.gl/maps/cooking-class', promotions: 'Recipe book included', availability: 'Mon-Sat 10:00, 17:00', duration: '3 hours' },
+        { title: 'Hot Air Balloon over Tuscany', description: 'Breathtaking views of the rolling hills.', price: 250, location: 'Siena', image: 'https://picsum.photos/seed/balloon/800/600', details: 'Includes champagne breakfast upon landing.', category: 'Adventure', price_level: 'high', rating: 4.9, reviews_count: 120, address: 'Strada di Montalbuccio, 53100 Siena SI', map_url: 'https://goo.gl/maps/balloon', promotions: 'GoPro footage included', availability: 'Daily at Sunrise', duration: '4 hours' }
       ];
-      const insert = db.prepare("INSERT INTO experiences (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
-      exps.forEach(e => insert.run(e.title, e.description, e.price, e.location, e.image, e.details));
+      const insert = db.prepare("INSERT INTO experiences (title, description, price, location, image, details, category, price_level, rating, reviews_count, address, map_url, promotions, availability, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      exps.forEach(e => insert.run(e.title, e.description, e.price, e.location, e.image, e.details, e.category, e.price_level, e.rating, e.reviews_count, e.address, e.map_url, e.promotions, e.availability, e.duration));
     }
 
     // Rentals
     const rentCount = db.prepare("SELECT COUNT(*) as count FROM rentals").get().count;
     if (rentCount === 0) {
       const rents = [
-        { title: 'Vintage Vespa Rental', description: 'Explore Rome like a local.', price: 60, location: 'Rome', image: 'https://picsum.photos/seed/vespa/800/600', details: 'Includes helmets and insurance.' },
-        { title: 'Luxury Yacht Charter', description: 'Sail the Amalfi Coast.', price: 1200, location: 'Positano', image: 'https://picsum.photos/seed/yacht/800/600', details: 'Full day charter with crew and snacks.' }
+        { title: 'Vintage Vespa Rental', description: 'Explore Rome like a local.', price: 60, location: 'Rome', image: 'https://picsum.photos/seed/vespa/800/600', details: 'Includes helmets and insurance.', category: 'Scooter', price_level: 'low', rating: 4.6, reviews_count: 340, address: 'Via dei Cimatori, 15, 00186 Roma RM', map_url: 'https://goo.gl/maps/vespa-rental', promotions: 'Free city map', availability: 'Daily 9:00 - 19:00' },
+        { title: 'Luxury Yacht Charter', description: 'Sail the Amalfi Coast.', price: 1200, location: 'Positano', image: 'https://picsum.photos/seed/yacht/800/600', details: 'Full day charter with crew and snacks.', category: 'Yacht', price_level: 'high', rating: 5, reviews_count: 45, address: 'Via Pasitea, 1, 84017 Positano SA', map_url: 'https://goo.gl/maps/yacht-charter', promotions: 'Snorkeling gear included', availability: 'May - Sept' }
       ];
-      const insert = db.prepare("INSERT INTO rentals (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
-      rents.forEach(r => insert.run(r.title, r.description, r.price, r.location, r.image, r.details));
+      const insert = db.prepare("INSERT INTO rentals (title, description, price, location, image, details, category, price_level, rating, reviews_count, address, map_url, promotions, availability) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      rents.forEach(r => insert.run(r.title, r.description, r.price, r.location, r.image, r.details, r.category, r.price_level, r.rating, r.reviews_count, r.address, r.map_url, r.promotions, r.availability));
     }
 
     // Events
     const eventCount = db.prepare("SELECT COUNT(*) as count FROM events").get().count;
     if (eventCount === 0) {
       const evs = [
-        { title: 'Opera at Verona Arena', description: 'A magical night under the stars.', price: 180, location: 'Verona', image: 'https://picsum.photos/seed/opera/800/600', details: 'Premium seats for Aida.' },
-        { title: 'Milan Fashion Week Pass', description: 'Exclusive access to top shows.', price: 500, location: 'Milan', image: 'https://picsum.photos/seed/fashion/800/600', details: 'VIP entry to 3 major shows.' }
+        { title: 'Opera at Verona Arena', description: 'A magical night under the stars.', price: 180, location: 'Verona', image: 'https://picsum.photos/seed/opera/800/600', details: 'Premium seats for Aida.', category: 'Music', price_level: 'high', rating: 4.9, reviews_count: 1200, address: 'Piazza Bra, 1, 37121 Verona VR', map_url: 'https://goo.gl/maps/verona-opera', promotions: 'Backstage tour for VIPs', availability: 'June - Sept' },
+        { title: 'Milan Fashion Week Pass', description: 'Exclusive access to top shows.', price: 500, location: 'Milan', image: 'https://picsum.photos/seed/fashion/800/600', details: 'VIP entry to 3 major shows.', category: 'Fashion', price_level: 'high', rating: 4.8, reviews_count: 320, address: 'Via della Spiga, 20121 Milano MI', map_url: 'https://goo.gl/maps/milan-fashion', promotions: 'Gift bag included', availability: 'Feb & Sept' }
       ];
-      const insert = db.prepare("INSERT INTO events (title, description, price, location, image, details) VALUES (?, ?, ?, ?, ?, ?)");
-      evs.forEach(e => insert.run(e.title, e.description, e.price, e.location, e.image, e.details));
+      const insert = db.prepare("INSERT INTO events (title, description, price, location, image, details, category, price_level, rating, reviews_count, address, map_url, promotions, availability) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+      evs.forEach(e => insert.run(e.title, e.description, e.price, e.location, e.image, e.details, e.category, e.price_level, e.rating, e.reviews_count, e.address, e.map_url, e.promotions, e.availability));
     }
 
     // Demo Reviews
@@ -552,13 +621,20 @@ async function startServer() {
 
   app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
-    const user: any = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-    if (user && await bcrypt.compare(password, user.password)) {
-      const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      const userToReturn = { id: user.id, email: user.email, name: user.name, role: user.role, avatar_url: user.avatar_url, wallet_balance: user.wallet_balance, bonus: user.bonus, status: user.status };
-      res.json({ user: userToReturn, token });
-    } else {
-      res.status(401).json({ error: "Invalid credentials" });
+    try {
+      const user: any = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+      if (user && await bcrypt.compare(password, user.password)) {
+        const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+        const userToReturn = { id: user.id, email: user.email, name: user.name, role: user.role, avatar_url: user.avatar_url, wallet_balance: user.wallet_balance, bonus: user.bonus, status: user.status };
+        console.log(`User logged in: ${user.email} (ID: ${user.id}, Role: ${user.role})`);
+        res.json({ user: userToReturn, token });
+      } else {
+        console.warn(`Login failed for email: ${email}`);
+        res.status(401).json({ error: "Invalid credentials" });
+      }
+    } catch (error) {
+      console.error("Login Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
@@ -577,14 +653,14 @@ async function startServer() {
     const items = db.prepare(`SELECT * FROM ${table}`).all();
     return items.map((item: any) => {
       const reviews: any = db.prepare("SELECT rating FROM reviews WHERE listing_id = ? AND listing_type = ?").all(item.id, type);
-      const avgRating = reviews.length > 0 ? reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length : 0;
+      const avgRating = reviews.length > 0 ? reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length : (item.rating || 0);
       return { 
         ...item, 
         type, 
         name: item.title,
-        stars: Math.round(avgRating) || 5,
+        stars: Math.round(avgRating) || 4,
         rating: avgRating, 
-        reviews_count: reviews.length 
+        reviews_count: reviews.length || item.reviews_count || 0
       };
     });
   };
@@ -608,79 +684,106 @@ async function startServer() {
     res.json([...tours, ...restaurants, ...hotels, ...taxi, ...experiences, ...rentals, ...events]);
   });
 
-  app.get("/api/:type/:id", (req, res) => {
-    const { type, id } = req.params;
-    const tableMap: any = { 
-      tours: 'tours', 
-      restaurants: 'restaurants', 
-      hotels: 'hotels', 
-      taxi: 'taxi_services',
-      experiences: 'experiences',
-      rentals: 'rentals',
-      events: 'events'
-    };
-    const table = tableMap[type];
-    if (!table) return res.status(404).json({ error: "Not found" });
-    const item: any = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
-    if (!item) return res.status(404).json({ error: "Not found" });
-    const reviews = db.prepare("SELECT * FROM reviews WHERE listing_id = ? AND listing_type = ? ORDER BY created_at DESC").all(id, type.slice(0, -1));
-    res.json({ ...item, reviews });
-  });
-
   app.post("/api/reviews", authenticateToken, (req: any, res) => {
     const { listing_id, itemId, listing_type, type, rating, comment } = req.body;
     const finalId = listing_id || itemId;
     const finalType = listing_type || type;
-    db.prepare("INSERT INTO reviews (user_id, listing_id, listing_type, rating, comment, username) VALUES (?, ?, ?, ?, ?, ?)").run(
-      req.user.id, finalId, finalType, rating, comment, req.user.name
-    );
-    res.json({ success: true });
+    try {
+      const result = db.prepare("INSERT INTO reviews (user_id, listing_id, listing_type, rating, comment, username) VALUES (?, ?, ?, ?, ?, ?)").run(
+        req.user.id, finalId, finalType, rating, comment, req.user.name || 'Anonymous'
+      );
+      const newReview = db.prepare("SELECT *, username as user_name FROM reviews WHERE id = ?").get(result.lastInsertRowid);
+      res.json(newReview);
+    } catch (e: any) {
+      console.error("Review Post Error:", e);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/reviews/:itemId", (req, res) => {
+    const { type } = req.query;
+    try {
+      const reviews = db.prepare("SELECT *, username as user_name FROM reviews WHERE listing_id = ? AND listing_type = ? ORDER BY created_at DESC").all(req.params.itemId, type);
+      res.json(reviews);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   app.post("/api/bookings", authenticateToken, (req: any, res) => {
     const { listing_id, itemId, listing_type, type, date, guests, amount } = req.body;
     const finalId = listing_id || itemId;
     const finalType = listing_type || type;
-    const result = db.prepare("INSERT INTO bookings (user_id, listing_id, listing_type, date, guests, amount) VALUES (?, ?, ?, ?, ?, ?)").run(
-      req.user.id, finalId, finalType, date || new Date().toISOString(), guests || 1, amount
-    );
-    res.json({ id: result.lastInsertRowid });
+    try {
+      const result = db.prepare("INSERT INTO bookings (user_id, listing_id, listing_type, date, guests, amount) VALUES (?, ?, ?, ?, ?, ?)").run(
+        req.user.id, finalId, finalType, date || new Date().toISOString(), guests || 1, amount
+      );
+      res.json({ id: result.lastInsertRowid, status: 'pending' });
+    } catch (e: any) {
+      console.error("Booking Post Error:", e);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   // Admin Panel
   app.get("/api/admin/stats", authenticateToken, isAdminMiddleware, (req, res) => {
-    const users = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-    const bookings = db.prepare("SELECT COUNT(*) as count FROM bookings").get().count;
-    const revenue = db.prepare("SELECT SUM(amount) as total FROM bookings WHERE status = 'confirmed'").get().total || 0;
-    res.json({ users, bookings, revenue });
+    try {
+      const users = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+      const bookings = db.prepare("SELECT COUNT(*) as count FROM bookings").get().count;
+      const revenue = db.prepare("SELECT SUM(amount) as total FROM bookings WHERE status = 'confirmed'").get().total || 0;
+      res.json({ users, bookings, revenue });
+    } catch (error) {
+      console.error("Admin Stats Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   });
 
   app.get("/api/admin/notifications", authenticateToken, isAdminMiddleware, (req, res) => {
-    const notifications = db.prepare("SELECT * FROM admin_notifications ORDER BY created_at DESC LIMIT 50").all();
-    res.json(notifications);
+    try {
+      const notifications = db.prepare("SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50").all();
+      res.json(notifications);
+    } catch (error) {
+      console.error("Admin Notifications Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   });
 
   app.post("/api/admin/notifications/read", authenticateToken, isAdminMiddleware, (req, res) => {
-    db.prepare("UPDATE admin_notifications SET read = 1").run();
-    res.json({ success: true });
+    try {
+      db.prepare("UPDATE notifications SET read = 1").run();
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin Notifications Read Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   });
 
   app.get("/api/admin/bookings", authenticateToken, isAdminMiddleware, (req, res) => {
-    const bookings = db.prepare(`
-      SELECT b.*, u.name as user_name, u.email as user_email 
-      FROM bookings b 
-      JOIN users u ON b.user_id = u.id 
-      ORDER BY b.created_at DESC
-    `).all();
-    res.json(bookings);
+    try {
+      const bookings = db.prepare(`
+        SELECT b.*, u.name as user_name, u.email as user_email 
+        FROM bookings b 
+        JOIN users u ON b.user_id = u.id 
+        ORDER BY b.created_at DESC
+      `).all();
+      res.json(bookings);
+    } catch (error) {
+      console.error("Admin Bookings Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   });
 
   app.get("/api/admin/listings", authenticateToken, isAdminMiddleware, (req, res) => {
-    const tours = db.prepare("SELECT *, 'tour' as type FROM tours").all();
-    const restaurants = db.prepare("SELECT *, 'restaurant' as type FROM restaurants").all();
-    const hotels = db.prepare("SELECT *, 'hotel' as type FROM hotels").all();
-    const taxi = db.prepare("SELECT *, 'taxi' as type FROM taxi_services").all();
-    res.json([...tours, ...restaurants, ...hotels, ...taxi]);
+    try {
+      const tours = db.prepare("SELECT *, 'tour' as type FROM tours").all();
+      const restaurants = db.prepare("SELECT *, 'restaurant' as type FROM restaurants").all();
+      const hotels = db.prepare("SELECT *, 'hotel' as type FROM hotels").all();
+      const taxi = db.prepare("SELECT *, 'taxi' as type FROM taxi_services").all();
+      res.json([...tours, ...restaurants, ...hotels, ...taxi]);
+    } catch (error) {
+      console.error("Admin Listings Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   });
 
   // Learning Platform Routes
@@ -697,15 +800,25 @@ async function startServer() {
   });
 
   app.get("/api/user/progress", authenticateToken, (req: any, res) => {
-    const user = req.user;
-    const progress = db.prepare(`
-      SELECT p.*, c.title as course_title, l.title as lesson_title 
-      FROM user_progress p
-      JOIN courses c ON p.course_id = c.id
-      JOIN lessons l ON p.lesson_id = l.id
-      WHERE p.user_id = ?
-    `).all(user.id);
-    res.json(progress);
+    try {
+      const user = req.user;
+      if (!user || !user.id) {
+        console.warn("Progress fetch failed: No user ID in token");
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const progress = db.prepare(`
+        SELECT p.*, c.title as course_title, l.title as lesson_title 
+        FROM user_progress p
+        JOIN courses c ON p.course_id = c.id
+        JOIN lessons l ON p.lesson_id = l.id
+        WHERE p.user_id = ?
+      `).all(user.id);
+      res.json(progress);
+    } catch (error) {
+      console.error("Progress Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   });
 
   // Messages
@@ -728,7 +841,12 @@ async function startServer() {
 
   // Admin Panel Extended
   app.get("/api/admin/users", authenticateToken, isAdminMiddleware, (req, res) => {
-    res.json(db.prepare("SELECT id, email, name, role, disabled, last_login, created_at FROM users").all());
+    try {
+      res.json(db.prepare("SELECT id, email, name, role, disabled, last_login, created_at FROM users").all());
+    } catch (error) {
+      console.error("Admin Users Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
   });
 
   app.post("/api/admin/users/:id/status", authenticateToken, isAdminMiddleware, (req, res) => {
@@ -744,18 +862,21 @@ async function startServer() {
   });
 
   app.post("/api/admin/listings", authenticateToken, isAdminMiddleware, (req, res) => {
-    const { id, type, name, location, price, stars, description, image, category } = req.body;
-    const tableMap: any = { tour: 'tours', restaurant: 'restaurants', hotel: 'hotels', taxi: 'taxi_services' };
+    const { id, type, name, title, location, price, stars, rating, description, image, category, price_level } = req.body;
+    const tableMap: any = { tour: 'tours', restaurant: 'restaurants', hotel: 'hotels', taxi: 'taxi_services', experience: 'experiences', rental: 'rentals', event: 'events' };
     const table = tableMap[type];
     if (!table) return res.status(400).json({ error: "Invalid type" });
 
+    const finalTitle = title || name;
+    const finalRating = rating || stars || 5;
+
     if (id) {
-      db.prepare(`UPDATE ${table} SET name = ?, location = ?, price = ?, stars = ?, description = ?, image = ?, category = ? WHERE id = ?`).run(
-        name, location, price, stars, description, image, category, id
+      db.prepare(`UPDATE ${table} SET title = ?, location = ?, price = ?, rating = ?, description = ?, image = ?, category = ?, price_level = ? WHERE id = ?`).run(
+        finalTitle, location, price, finalRating, description, image, category, price_level, id
       );
     } else {
-      db.prepare(`INSERT INTO ${table} (name, location, price, stars, description, image, category) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
-        name, location, price, stars, description, image, category
+      db.prepare(`INSERT INTO ${table} (title, location, price, rating, description, image, category, price_level) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        finalTitle, location, price, finalRating, description, image, category, price_level
       );
     }
     res.json({ success: true });
@@ -913,18 +1034,6 @@ async function startServer() {
     res.json(bookings);
   });
 
-  app.post("/api/bookings", authenticateToken, (req: any, res) => {
-    const { listing_id, listing_type, date, guests, amount } = req.body;
-    try {
-      const result = db.prepare("INSERT INTO bookings (user_id, listing_id, listing_type, date, guests, amount) VALUES (?, ?, ?, ?, ?, ?)").run(
-        req.user.id, listing_id, listing_type, date, guests, amount
-      );
-      res.json({ id: result.lastInsertRowid, status: 'pending' });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
   // Reviews
   app.get("/api/reviews/:itemId", (req, res) => {
     const { type } = req.query;
@@ -947,67 +1056,27 @@ async function startServer() {
     res.json(reviews);
   });
 
-  app.post("/api/reviews", authenticateToken, (req: any, res) => {
-    const { listing_id, listing_type, rating, comment } = req.body;
-    try {
-      db.prepare("INSERT INTO reviews (user_id, listing_id, listing_type, rating, comment, username) VALUES (?, ?, ?, ?, ?, ?)").run(
-        req.user.id, listing_id, listing_type, rating, comment, req.user.name
-      );
-      res.json({ success: true });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post("/api/game-win", authenticateToken, (req: any, res) => {
-    db.prepare("UPDATE users SET last_game_win = CURRENT_TIMESTAMP WHERE id = ?").run(req.user.id);
-    res.json({ status: "ok" });
-  });
-
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
-  app.get("/api/offers", (req, res) => {
-    const currentUser: any = (req as any).user;
-    if (!currentUser) return res.json([]);
-
-    // Dynamic offers logic
-    const offers = [
-      { id: 'off1', name: 'Colosseum Private Tour', type: 'tour', originalPrice: 150, discountPoints: 50, discountValue: 30, image: 'https://picsum.photos/seed/colosseum/400/300' },
-      { id: 'off2', name: 'Venice Gondola Dinner', type: 'experience', originalPrice: 250, discountPoints: 100, discountValue: 60, image: 'https://picsum.photos/seed/gondola/400/300' },
-      { id: 'off3', name: 'Tuscan Wine Tasting', type: 'experience', originalPrice: 80, discountPoints: 20, discountValue: 15, image: 'https://picsum.photos/seed/wine/400/300' },
-      { id: 'off4', name: 'Luxury Suite Upgrade - Rome', type: 'hotel', originalPrice: 400, discountPoints: 200, discountValue: 120, image: 'https://picsum.photos/seed/suite/400/300' },
-    ];
-
-    // Randomly shuffle or select offers to "vary and update over time"
-    const shuffled = offers.sort(() => 0.5 - Math.random()).slice(0, 3);
-    res.json(shuffled);
-  });
-
-  app.post("/api/redeem", (req, res) => {
-    const { offerId, points } = req.body;
-    const currentUser: any = (req as any).user;
-    if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
-    
-    const pointsToDeduct = Number(points);
-    if (isNaN(pointsToDeduct) || pointsToDeduct <= 0) {
-      return res.status(400).json({ error: "Invalid points amount" });
-    }
-
-    const user = db.prepare("SELECT id, bonus FROM users WHERE id = ?").get(currentUser.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (user.bonus < pointsToDeduct) {
-      return res.status(400).json({ error: "Insufficient bonus points" });
-    }
-
-    try {
-      db.prepare("UPDATE users SET bonus = bonus - ? WHERE id = ?").run(pointsToDeduct, user.id);
-      res.json({ success: true, newBonus: user.bonus - pointsToDeduct });
-    } catch (err) {
-      res.status(500).json({ error: "Failed to update bonus points" });
-    }
+  app.get("/api/:type/:id", (req, res) => {
+    const { type, id } = req.params;
+    const tableMap: any = { 
+      tours: 'tours', 
+      restaurants: 'restaurants', 
+      hotels: 'hotels', 
+      taxi: 'taxi_services',
+      experiences: 'experiences',
+      rentals: 'rentals',
+      events: 'events'
+    };
+    const table = tableMap[type];
+    if (!table) return res.status(404).json({ error: "Not found" });
+    const item: any = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+    if (!item) return res.status(404).json({ error: "Not found" });
+    const reviews = db.prepare("SELECT * FROM reviews WHERE listing_id = ? AND listing_type = ? ORDER BY created_at DESC").all(id, type.slice(0, -1));
+    res.json({ ...item, reviews });
   });
 
   // Vite Integration & Static Files
