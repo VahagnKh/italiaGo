@@ -1,0 +1,145 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "created_at"]
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "A travel listing (hotel, restaurant, tour, etc.)",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "location": { "type": "string" },
+        "image": { "type": "string" },
+        "rating": { "type": "number" },
+        "type": { "type": "string", "enum": ["hotel", "restaurant", "tour", "rental", "event", "taxi"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "price", "location", "image", "rating", "type", "created_at"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "User review for a listing",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "listing_id": { "type": "string" },
+        "listing_type": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "listing_id", "listing_type", "rating", "comment", "created_at"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "User booking for a listing",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "listing_id": { "type": "string" },
+        "listing_type": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "guests": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "cancelled"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "listing_id", "listing_type", "date", "guests", "status", "created_at"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "User favorite listing",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "listing_id": { "type": "string" },
+        "listing_type": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "listing_id", "listing_type", "created_at"]
+    },
+    "PaymentMethod": {
+      "title": "PaymentMethod",
+      "description": "User saved payment method",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "card_last4": { "type": "string" },
+        "card_brand": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "card_last4", "card_brand", "created_at"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "text": { "type": "string" },
+        "is_read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "title", "text", "is_read", "created_at"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "User message",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "text": { "type": "string" },
+        "is_read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "title", "text", "is_read", "created_at"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/listings/{listingId}": {
+      "schema": "Listing",
+      "description": "Travel listings"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Listing reviews"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "User bookings"
+    },
+    "/favorites/{favoriteId}": {
+      "schema": "Favorite",
+      "description": "User favorites"
+    },
+    "/payment_methods/{methodId}": {
+      "schema": "PaymentMethod",
+      "description": "User payment methods"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notifications"
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "User messages"
+    }
+  }
+}
