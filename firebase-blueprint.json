@@ -113,9 +113,33 @@
       "schema": "User",
       "description": "User profiles"
     },
-    "/listings/{listingId}": {
+    "/hotels/{id}": {
       "schema": "Listing",
-      "description": "Travel listings"
+      "description": "Hotels"
+    },
+    "/restaurants/{id}": {
+      "schema": "Listing",
+      "description": "Restaurants"
+    },
+    "/experiences/{id}": {
+      "schema": "Listing",
+      "description": "Experiences"
+    },
+    "/tours/{id}": {
+      "schema": "Listing",
+      "description": "Tours"
+    },
+    "/rentals/{id}": {
+      "schema": "Listing",
+      "description": "Rentals"
+    },
+    "/events/{id}": {
+      "schema": "Listing",
+      "description": "Events"
+    },
+    "/taxi/{id}": {
+      "schema": "Listing",
+      "description": "Taxi services"
     },
     "/reviews/{reviewId}": {
       "schema": "Review",

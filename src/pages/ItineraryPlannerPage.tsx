@@ -42,7 +42,7 @@ const ItineraryPlannerPage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-stone-50">
-      <Navbar />
+      <Navbar onAuthClick={() => {}} onAIClick={() => {}} onAdminClick={() => {}} />
       
       <main className="flex-grow max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">

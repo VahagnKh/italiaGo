@@ -1,0 +1,58 @@
+src/components/AIConcierge.tsx:                        {LANGUAGES.map(l => (
+src/components/AIConcierge.tsx:              {messages.map((msg) => (
+src/components/AIConcierge.tsx:                      {[0, 1, 2].map(i => (
+src/components/AdminView.tsx:            {menuItems.map((item) => (
+src/components/AdminView.tsx:                    {item.children.map((child) => (
+src/components/AdminView.tsx:                  {notifications.map(n => (
+src/components/AdminView.tsx:                {stats.map((stat) => (
+src/components/AdminView.tsx:                        {activityLogs.slice(0, 5).map(log => (
+src/components/AdminView.tsx:                      {filteredUsers.map((u) => (
+src/components/AdminView.tsx:                    {activityLogs.map(log => (
+src/components/AdminView.tsx:                    {adminLogs.map(log => (
+src/components/AdminView.tsx:                          {COLORS.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+src/components/AdminView.tsx:                {adminMessages.map((msg) => (
+src/components/AdminView.tsx:                      {notifications.filter(n => n.type === 'security').map(n => (
+src/components/AdminView.tsx:                  ).map((listing) => (
+src/components/AdminView.tsx:                        <div className="flex items-center gap-1 text-gold">{Array.from({ length: listing.stars }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}</div>
+src/components/AdminView.tsx:                      {[{id:'hotel',label:'Hotel'},{id:'restaurant',label:'Restaurant'},{id:'tour',label:'Tour'},{id:'experience',label:'Experience'},{id:'rental',label:'Rental'},{id:'event',label:'Event'}].map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+src/App.tsx:      setAdminNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
+src/App.tsx:                    {[1, 2, 3].map(i => (
+src/App.tsx:                      basket.map((item) => (
+src/App.tsx:                    {LANGUAGES.map(l => (
+src/App.tsx:                        adminNotifications.map((n) => (
+src/App.tsx:                      {user.name.split(' ').map((n: any) => n[0]).join('')}
+src/App.tsx:          {notifications.map(n => (
+src/App.tsx:        ].map((item, i) => (
+src/App.tsx:          {DESTINATIONS.map((dest) => (
+src/App.tsx:            {STORIES.map((story) => (
+src/App.tsx:                {board.map((cell, i) => (
+src/App.tsx:                      {bookings.map((booking) => (
+src/App.tsx:                {favorites.map((item) => (
+src/App.tsx:                          {Array.from({ length: item.stars }).map((_, j) => (
+src/App.tsx:                {offers.map((offer) => (
+src/App.tsx:                        {avatars.map((av) => (
+src/App.tsx:        {menuItems.map(item => (
+src/App.tsx:            {['popular', 'best-price', 'near-me'].map((tab) => (
+src/App.tsx:          {hotels.slice(0, 3).map((hotel) => (
+src/App.tsx:            {resorts.map((resort) => (
+src/App.tsx:              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+src/App.tsx:              {Array.from({ length: 31 }).map((_, i) => {
+src/App.tsx:        ].map((item, i) => (
+src/App.tsx:          {friends.map((friend, i) => (
+src/App.tsx:        {messages.map((m) => (
+src/App.tsx:                {basket.map((item) => (
+src/App.tsx:          {[1, 2, 3, 4, 5].map(num => (
+src/App.tsx:          reviews.map(review => (
+src/App.tsx:                  {Array.from({ length: 5 }).map((_, i) => (
+src/App.tsx:  const locations = Array.from(new Set(['all', ...items.map(item => item.location), filter].filter(Boolean)));
+src/App.tsx:                {locations.map(loc => (
+src/App.tsx:                {priceLevels.map(level => (
+src/App.tsx:                {starLevels.map(level => (
+src/App.tsx:          filteredItems.map((item) => (
+src/App.tsx:                    {Array.from({ length: item.stars }).map((_, j) => (
+src/App.tsx:                      {(typeof selectedItem.amenities === 'string' ? selectedItem.amenities.split(',') : selectedItem.amenities).map((a: string) => (
+src/App.tsx:        {suggestions.map(item => (
+src/App.tsx:                  {['all', 3, 4, 5].map(level => (
+src/App.tsx:                    ].map(opt => (
+src/App.tsx:            {filteredVehicles.map((v, i) => (
+src/App.tsx:                    {Array.from({ length: v.stars }).map((_, j) => (

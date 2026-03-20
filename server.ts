@@ -4,27 +4,47 @@ import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { WebSocketServer, WebSocket } from "ws";
+import session from "express-session";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import helmet from "helmet";
 import cors from "cors";
 import Stripe from "stripe";
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
-import firebaseConfig from './firebase-applet-config.json' assert { type: 'json' };
 
+import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
+import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
+
+const JWT_SECRET = process.env.JWT_SECRET || "italiago-jwt-secret-2026";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock");
+
+// Initialize Firebase Admin
 if (!getApps().length) {
   initializeApp({
     projectId: firebaseConfig.projectId,
   });
 }
 
-const db = getFirestore(firebaseConfig.firestoreDatabaseId);
+const firestore = getFirestore(firebaseConfig.firestoreDatabaseId);
 const auth = getAuth();
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock");
+declare module "express-session" {
+  interface SessionData {
+    userId: number;
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// SQLite is deprecated in favor of Firestore for Vercel compatibility
+// const db = new Database("italiago.db");
+// db.pragma('journal_mode = WAL');
+
+// SQLite initialization removed for Vercel/Firestore compatibility
+
+// Migrations removed
 
 async function startServer() {
   const app = express();
@@ -35,38 +55,29 @@ async function startServer() {
   const games = new Map<string, { players: WebSocket[], board: (string|null)[], turn: number }>();
   const adminClients = new Set<WebSocket>();
 
-  app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors());
-  app.use(express.json());
-
-  // Authentication Middleware
-  const authenticateToken = async (req: any, res: any, next: any) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (!token) return res.sendStatus(401);
+  const notifyAdmins = async (type: string, message: string, details?: any) => {
+    const notification = {
+      type,
+      message,
+      created_at: new Date().toISOString(),
+      read: 0
+    };
+    
     try {
-      const decodedToken = await auth.verifyIdToken(token);
-      req.user = {
-        id: decodedToken.uid,
-        uid: decodedToken.uid,
-        email: decodedToken.email,
-        role: decodedToken.role || 'user'
-      };
-      next();
-    } catch (err) {
-      console.error(`Auth failed: Invalid token`, err);
-      return res.sendStatus(403);
+      const docRef = firestore.collection('notifications').doc();
+      await docRef.set({ id: docRef.id, ...notification });
+      
+      const wsMessage = JSON.stringify({ type: 'notification', notification: { id: docRef.id, ...notification }, details });
+      adminClients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(wsMessage);
+        }
+      });
+    } catch (e) {
+      console.error("Failed to create notification:", e);
     }
   };
 
-  const isAdminMiddleware = (req: any, res: any, next: any) => {
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-    next();
-  };
-
-  // WebSocket Logic
   wss.on('connection', (ws) => {
     let roomId: string | null = null;
     let isAdmin = false;
@@ -99,7 +110,6 @@ async function startServer() {
             }
           }
         }
-
         if (message.type === 'move') {
           const game = games.get(roomId!)!;
           if (!game) return;
@@ -127,9 +137,10 @@ async function startServer() {
         }
       } catch (e) { console.error(e); }
     });
-
     ws.on('close', () => {
-      if (isAdmin) adminClients.delete(ws);
+      if (isAdmin) {
+        adminClients.delete(ws);
+      }
       if (roomId && games.has(roomId)) {
         const game = games.get(roomId)!;
         game.players.forEach(p => { if (p !== ws) p.send(JSON.stringify({ type: 'opponentLeft' })); });
@@ -138,203 +149,261 @@ async function startServer() {
     });
   });
 
-  // Auto-seeding
-  const listingsSnap = await db.collection('listings').limit(1).get();
-  if (listingsSnap.empty) {
-    console.log("Database empty, seeding demo data...");
-    const categories = ['Hotels', 'Restaurants', 'Experiences', 'Tours', 'Rentals', 'Events', 'Taxi'];
-    const cities = ['Rome', 'Venice', 'Florence', 'Milan', 'Naples', 'Amalfi'];
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use(cors());
+  app.use(express.json());
+  
+  // Authentication Middleware
+  const authenticateToken = (req: any, res: any, next: any) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
     
-    for (const cat of categories) {
-      for (let i = 1; i <= 12; i++) {
-        const city = cities[Math.floor(Math.random() * cities.length)];
-        const listing = {
-          category: cat,
-          title: `${cat} in ${city} #${i}`,
-          location: city,
-          price: Math.floor(Math.random() * 500) + 50,
-          rating: 4 + Math.random(),
-          image: `https://picsum.photos/seed/${cat}${city}${i}/800/600`,
-          description: `A beautiful ${cat.toLowerCase()} located in the heart of ${city}. Experience the authentic Italian lifestyle with premium amenities and local charm.`,
+    if (!token || token === 'null' || token === 'undefined') {
+      console.warn(`Auth failed: No or invalid token for ${req.path}`);
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+      if (err) {
+        console.error(`Auth failed: Invalid token for ${req.path}`, err.message);
+        return res.status(403).json({ error: "Invalid token" });
+      }
+      req.user = user;
+      next();
+    });
+  };
+
+  const isAdminMiddleware = (req: any, res: any, next: any) => {
+    if (req.user?.role !== 'admin') {
+      console.warn(`Admin access denied for user ${req.user?.id} (${req.user?.role}) at ${req.path}`);
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    next();
+  };
+
+  // Activity Tracking Middleware
+  app.use(async (req: any, res, next) => {
+    const user = req.user;
+    if (user && req.method !== 'GET' && !req.path.startsWith('/api/admin')) {
+      try {
+        const logRef = firestore.collection('activity_logs').doc();
+        await logRef.set({
+          id: logRef.id,
+          user_id: user.id,
+          action: req.method,
+          page: req.path,
+          details: JSON.stringify(req.body),
+          ip: req.ip,
+          user_agent: req.get('user-agent'),
           created_at: new Date().toISOString()
-        };
-        const docRef = await db.collection('listings').add(listing);
-        
-        // Add some demo reviews
-        for (let j = 1; j <= 3; j++) {
-          await db.collection('reviews').add({
-            listing_id: docRef.id,
-            user_id: 'demo-user',
-            user_name: 'Traveler ' + j,
-            rating: 4 + Math.random(),
-            comment: `Amazing ${cat.toLowerCase()}! Highly recommended for anyone visiting ${city}.`,
-            created_at: new Date().toISOString()
-          });
-        }
+        });
+      } catch (e) {
+        console.error("Activity Log Error:", e);
       }
     }
-    console.log("Seeding complete.");
-  }
+    next();
+  });
 
-  // API Routes
+// seedData removed
+
+  // Authentication Routes
   app.post("/api/register", async (req, res) => {
-    const { uid, email, name } = req.body;
-    if (!uid || !email || !name) return res.status(400).json({ error: "Missing fields" });
+    const { email, password, name } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: "Missing fields" });
     try {
-      const userRef = db.collection('users').doc(uid);
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const userRef = firestore.collection('users').doc();
       const user = { 
-        name, 
+        id: userRef.id, 
         email, 
-        role: 'user', 
-        wallet_balance: 0, 
-        bonus: 0, 
+        password: hashedPassword, 
+        name, 
+        role: 'user',
+        wallet_balance: 0,
+        bonus: 0,
         status: 'Normal',
-        created_at: new Date().toISOString() 
+        created_at: new Date().toISOString()
       };
       await userRef.set(user);
-      res.json({ user: { id: uid, ...user } });
+      
+      const { password: _, ...userToReturn } = user;
+      const token = jwt.sign(userToReturn, JWT_SECRET, { expiresIn: '7d' });
+      res.json({ user: userToReturn, token });
     } catch (err) {
-      console.error("Register Error:", err);
-      res.status(500).json({ error: "Failed to save user profile" });
+      console.error("Registration Error:", err);
+      res.status(400).json({ error: "Email already exists or registration failed" });
+    }
+  });
+
+  app.post("/api/login", async (req, res) => {
+    const { email, password } = req.body;
+    try {
+      const snapshot = await firestore.collection('users').where('email', '==', email).limit(1).get();
+      if (snapshot.empty) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+      
+      const userDoc = snapshot.docs[0];
+      const user = userDoc.data();
+      
+      if (user && await bcrypt.compare(password, user.password)) {
+        const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+        const { password: _, ...userToReturn } = user;
+        console.log(`User logged in: ${user.email} (ID: ${user.id}, Role: ${user.role})`);
+        res.json({ user: userToReturn, token });
+      } else {
+        res.status(401).json({ error: "Invalid credentials" });
+      }
+    } catch (error) {
+      console.error("Login Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
   app.get("/api/users/me", authenticateToken, async (req: any, res) => {
     try {
-      const userDoc = await db.collection('users').doc(req.user.id).get();
+      const userDoc = await firestore.collection('users').doc(req.user.id).get();
       if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
-      res.json({ id: userDoc.id, ...userDoc.data() });
-    } catch (err) {
-      res.status(500).json({ error: "Internal Server Error" });
+      const { password: _, ...user } = userDoc.data() as any;
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
     }
   });
 
+  app.get("/api/user", authenticateToken, async (req: any, res) => {
+    try {
+      const userDoc = await firestore.collection('users').doc(req.user.id).get();
+      if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+      const { password: _, ...user } = userDoc.data() as any;
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // Firestore Listings Fetcher
+  const fetchListings = async (collectionName: string, type: string) => {
+    try {
+      const snapshot = await firestore.collection(collectionName).get();
+      const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Fetch reviews for each item to calculate average rating
+      const listingsWithRatings = await Promise.all(items.map(async (item: any) => {
+        const reviewsSnapshot = await firestore.collection('reviews')
+          .where('listing_id', '==', item.id)
+          .where('listing_type', '==', type)
+          .get();
+        
+        const reviews = reviewsSnapshot.docs.map(doc => doc.data());
+        const avgRating = reviews.length > 0 
+          ? reviews.reduce((acc: number, r: any) => acc + r.rating, 0) / reviews.length 
+          : (item.rating || 0);
+          
+        return { 
+          ...item, 
+          type, 
+          name: item.title,
+          stars: Math.round(avgRating) || 4,
+          rating: avgRating, 
+          reviews_count: reviews.length || item.reviews_count || 0
+        };
+      }));
+      
+      return listingsWithRatings;
+    } catch (error) {
+      console.error(`Error fetching ${collectionName}:`, error);
+      return [];
+    }
+  };
+
+  app.get("/api/tours", async (req, res) => res.json(await fetchListings('tours', 'tour')));
+  app.get("/api/restaurants", async (req, res) => res.json(await fetchListings('restaurants', 'restaurant')));
+  app.get("/api/hotels", async (req, res) => res.json(await fetchListings('hotels', 'hotel')));
+  app.get("/api/taxi", async (req, res) => res.json(await fetchListings('taxi', 'taxi')));
+  app.get("/api/experiences", async (req, res) => res.json(await fetchListings('experiences', 'experience')));
+  app.get("/api/rentals", async (req, res) => res.json(await fetchListings('rentals', 'rental')));
+  app.get("/api/events", async (req, res) => res.json(await fetchListings('events', 'event')));
+
   app.get("/api/listings", async (req, res) => {
     try {
-      const snapshot = await db.collection('listings').get();
-      res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (err) {
+      const [tours, restaurants, hotels, taxi, experiences, rentals, events] = await Promise.all([
+        fetchListings('tours', 'tour'),
+        fetchListings('restaurants', 'restaurant'),
+        fetchListings('hotels', 'hotel'),
+        fetchListings('taxi', 'taxi'),
+        fetchListings('experiences', 'experience'),
+        fetchListings('rentals', 'rental'),
+        fetchListings('events', 'event')
+      ]);
+      res.json([...tours, ...restaurants, ...hotels, ...taxi, ...experiences, ...rentals, ...events]);
+    } catch (error) {
       res.status(500).json({ error: "Failed to fetch listings" });
     }
   });
 
-  app.get("/api/search", async (req, res) => {
-    const { q, category, minPrice, maxPrice, minRating } = req.query;
-    try {
-      let query: any = db.collection('listings');
-      if (category && category !== 'All') query = query.where('category', '==', category);
-      
-      const snapshot = await query.get();
-      let results = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
-      
-      if (q) {
-        const searchStr = String(q).toLowerCase();
-        results = results.filter((l: any) => 
-          (l.title && l.title.toLowerCase().includes(searchStr)) || 
-          (l.name && l.name.toLowerCase().includes(searchStr)) ||
-          (l.description && l.description.toLowerCase().includes(searchStr))
-        );
-      }
-      
-      if (minPrice) results = results.filter((l: any) => l.price >= Number(minPrice));
-      if (maxPrice) results = results.filter((l: any) => l.price <= Number(maxPrice));
-      if (minRating) results = results.filter((l: any) => (l.rating || l.stars || 0) >= Number(minRating));
-      
-      res.json(results);
-    } catch (error) {
-      res.status(500).json({ error: "Search failed" });
-    }
-  });
-
   app.post("/api/reviews", authenticateToken, async (req: any, res) => {
-    const { listing_id, listing_type, rating, comment } = req.body;
+    const { listing_id, itemId, listing_type, type, rating, comment } = req.body;
+    const finalId = listing_id || itemId;
+    const finalType = listing_type || type;
     try {
-      const review = {
+      const reviewRef = firestore.collection('reviews').doc();
+      const newReview = {
+        id: reviewRef.id,
         user_id: req.user.id,
-        listing_id,
-        listing_type,
-        rating: Number(rating),
+        listing_id: finalId,
+        listing_type: finalType,
+        rating,
         comment,
+        username: req.user.name || 'Anonymous',
+        user_name: req.user.name || 'Anonymous',
         created_at: new Date().toISOString()
       };
-      const docRef = await db.collection('reviews').add(review);
-      res.json({ id: docRef.id, ...review });
+      await reviewRef.set(newReview);
+      res.json(newReview);
     } catch (e: any) {
+      console.error("Review Post Error:", e);
       res.status(500).json({ error: e.message });
     }
   });
 
   app.get("/api/reviews/:itemId", async (req, res) => {
+    const { type } = req.query;
     try {
-      const snapshot = await db.collection('reviews')
+      const snapshot = await firestore.collection('reviews')
         .where('listing_id', '==', req.params.itemId)
+        .where('listing_type', '==', type)
         .orderBy('created_at', 'desc')
         .get();
-      const reviews = await Promise.all(snapshot.docs.map(async doc => {
-        const data = doc.data();
-        const userDoc = await db.collection('users').doc(data.user_id).get();
-        return { id: doc.id, ...data, user_name: userDoc.data()?.name || 'Anonymous' };
-      }));
+      const reviews = snapshot.docs.map(doc => doc.data());
       res.json(reviews);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch reviews" });
+    } catch (e: any) {
+      console.error("Review Fetch Error:", e);
+      res.status(500).json({ error: e.message });
     }
   });
 
   app.post("/api/bookings", authenticateToken, async (req: any, res) => {
-    const { listing_id, listing_type, date, guests, amount, title } = req.body;
+    const { listing_id, itemId, listing_type, type, date, guests, amount } = req.body;
+    const finalId = listing_id || itemId;
+    const finalType = listing_type || type;
     try {
-      const booking = {
+      const bookingRef = firestore.collection('bookings').doc();
+      const newBooking = {
+        id: bookingRef.id,
         user_id: req.user.id,
-        listing_id,
-        listing_type,
-        date,
-        guests: Number(guests),
-        amount: Number(amount),
-        title,
+        listing_id: finalId,
+        listing_type: finalType,
+        date: date || new Date().toISOString(),
+        guests: guests || 1,
+        amount,
         status: 'pending',
         created_at: new Date().toISOString()
       };
-      const docRef = await db.collection('bookings').add(booking);
-      res.json({ id: docRef.id, ...booking });
+      await bookingRef.set(newBooking);
+      res.json(newBooking);
     } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.get("/api/bookings/user", authenticateToken, async (req: any, res) => {
-    try {
-      const snapshot = await db.collection('bookings')
-        .where('user_id', '==', req.user.id)
-        .orderBy('created_at', 'desc')
-        .get();
-      res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post("/api/favorites", authenticateToken, async (req: any, res) => {
-    const { listing_id, listing_type } = req.body;
-    try {
-      const favorite = {
-        user_id: req.user.id,
-        listing_id,
-        listing_type,
-        created_at: new Date().toISOString()
-      };
-      const docRef = await db.collection('favorites').add(favorite);
-      res.json({ id: docRef.id, ...favorite });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.get("/api/favorites", authenticateToken, async (req: any, res) => {
-    try {
-      const snapshot = await db.collection('favorites').where('user_id', '==', req.user.id).get();
-      res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    } catch (e: any) {
+      console.error("Booking Post Error:", e);
       res.status(500).json({ error: e.message });
     }
   });
@@ -342,102 +411,562 @@ async function startServer() {
   // Admin Panel
   app.get("/api/admin/stats", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const usersSnap = await db.collection('users').get();
-      const bookingsSnap = await db.collection('bookings').get();
-      const revenue = bookingsSnap.docs
-        .filter(doc => doc.data().status === 'paid')
-        .reduce((acc, doc) => acc + (doc.data().amount || 0), 0);
-      res.json({ users: usersSnap.size, bookings: bookingsSnap.size, revenue });
+      const usersSnapshot = await firestore.collection('users').get();
+      const bookingsSnapshot = await firestore.collection('bookings').get();
+      const confirmedBookings = await firestore.collection('bookings').where('status', '==', 'confirmed').get();
+      
+      const users = usersSnapshot.size;
+      const bookings = bookingsSnapshot.size;
+      const revenue = confirmedBookings.docs.reduce((acc, doc) => acc + (doc.data().amount || 0), 0);
+      
+      res.json({ users, bookings, revenue });
     } catch (error) {
+      console.error("Admin Stats Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/admin/notifications", authenticateToken, isAdminMiddleware, async (req, res) => {
+    try {
+      const snapshot = await firestore.collection('notifications').orderBy('created_at', 'desc').limit(50).get();
+      const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(notifications);
+    } catch (error) {
+      console.error("Admin Notifications Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  app.post("/api/admin/notifications/read", authenticateToken, isAdminMiddleware, async (req, res) => {
+    try {
+      const snapshot = await firestore.collection('notifications').where('read', '==', 0).get();
+      const batch = firestore.batch();
+      snapshot.docs.forEach(doc => {
+        batch.update(doc.ref, { read: 1 });
+      });
+      await batch.commit();
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin Notifications Read Error:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
   app.get("/api/admin/bookings", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await db.collection('bookings').orderBy('created_at', 'desc').get();
-      const bookings = await Promise.all(snapshot.docs.map(async doc => {
-        const data = doc.data();
-        const userDoc = await db.collection('users').doc(data.user_id).get();
-        return { id: doc.id, ...data, user_name: userDoc.data()?.name || 'Unknown', user_email: userDoc.data()?.email || 'Unknown' };
+      const snapshot = await firestore.collection('bookings').orderBy('created_at', 'desc').get();
+      const bookings = await Promise.all(snapshot.docs.map(async (doc) => {
+        const booking = doc.data();
+        const userDoc = await firestore.collection('users').doc(booking.user_id).get();
+        const userData = userDoc.data() || {};
+        return {
+          ...booking,
+          user_name: userData.name || 'Unknown',
+          user_email: userData.email || 'Unknown'
+        };
       }));
       res.json(bookings);
     } catch (error) {
+      console.error("Admin Bookings Fetch Error:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
+  app.get("/api/admin/listings", authenticateToken, isAdminMiddleware, async (req, res) => {
+    try {
+      const collections = ['tours', 'restaurants', 'hotels', 'taxi_services', 'experiences', 'rentals', 'events'];
+      const results = await Promise.all(collections.map(async (col) => {
+        const snapshot = await firestore.collection(col).get();
+        return snapshot.docs.map(doc => ({ ...doc.data(), type: col.replace('_services', '').slice(0, -1) }));
+      }));
+      res.json(results.flat());
+    } catch (error) {
+      console.error("Admin Listings Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  // Learning Platform Routes
+  app.get("/api/courses", async (req, res) => {
+    try {
+      const snapshot = await firestore.collection('courses').get();
+      const courses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(courses);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch courses" });
+    }
+  });
+
+  app.get("/api/courses/:id", async (req, res) => {
+    try {
+      const courseDoc = await firestore.collection('courses').doc(req.params.id).get();
+      if (!courseDoc.exists) return res.status(404).json({ error: "Course not found" });
+      
+      const lessonsSnapshot = await firestore.collection('courses').doc(req.params.id).collection('lessons').orderBy('order_index', 'asc').get();
+      const lessons = lessonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      res.json({ id: courseDoc.id, ...courseDoc.data(), lessons });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch course details" });
+    }
+  });
+
+  app.get("/api/user/progress", authenticateToken, async (req: any, res) => {
+    try {
+      const snapshot = await firestore.collection('user_progress')
+        .where('user_id', '==', req.user.id)
+        .get();
+      const progress = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      res.json(progress);
+    } catch (error) {
+      console.error("Progress Fetch Error:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  // Messages
+  app.get("/api/messages", authenticateToken, async (req: any, res) => {
+    try {
+      const snapshot = await firestore.collection('messages')
+        .where('receiver_id', '==', req.user.id)
+        .orderBy('created_at', 'desc')
+        .get();
+      const sentSnapshot = await firestore.collection('messages')
+        .where('sender_id', '==', req.user.id)
+        .orderBy('created_at', 'desc')
+        .get();
+        
+      const messages = [...snapshot.docs, ...sentSnapshot.docs]
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/messages", authenticateToken, async (req: any, res) => {
+    const { receiverId, content } = req.body;
+    try {
+      const messageRef = firestore.collection('messages').doc();
+      await messageRef.set({
+        id: messageRef.id,
+        sender_id: req.user.id,
+        receiver_id: receiverId,
+        content,
+        created_at: new Date().toISOString()
+      });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Admin Panel Extended
   app.get("/api/admin/users", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await db.collection('users').get();
-      res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const snapshot = await firestore.collection('users').get();
+      const users = snapshot.docs.map(doc => {
+        const data = doc.data();
+        const { password: _, ...user } = data as any;
+        return user;
+      });
+      res.json(users);
     } catch (error) {
+      console.error("Admin Users Fetch Error:", error);
       res.status(500).json({ error: "Internal Server Error" });
     }
   });
 
-  app.get("/api/listings/:id", async (req, res) => {
-    const { id } = req.params;
+  app.post("/api/admin/users/:id/status", authenticateToken, isAdminMiddleware, async (req, res) => {
+    const { disabled } = req.body;
     try {
-      const doc = await db.collection('listings').doc(id).get();
-      if (!doc.exists) return res.status(404).json({ error: "Listing not found" });
-      
-      const reviewsSnap = await db.collection('reviews').where('listing_id', '==', id).get();
-      const reviews = await Promise.all(reviewsSnap.docs.map(async d => {
-        const data = d.data();
-        const userDoc = await db.collection('users').doc(data.user_id).get();
-        return { id: d.id, ...data, user_name: userDoc.data()?.name || 'Anonymous' };
-      }));
-      
-      res.json({ id: doc.id, ...doc.data(), reviews });
+      await firestore.collection('users').doc(req.params.id).update({ disabled: disabled ? 1 : 0 });
+      res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch listing" });
+      res.status(500).json({ error: "Failed to update user status" });
     }
   });
 
-  // Stripe
-  app.post("/api/create-checkout-session", authenticateToken, async (req: any, res) => {
-    const { bookingId } = req.body;
+  app.post("/api/admin/users/:id/role", authenticateToken, isAdminMiddleware, async (req, res) => {
+    const { role } = req.body;
     try {
-      const bookingDoc = await db.collection('bookings').doc(bookingId).get();
-      if (!bookingDoc.exists) return res.status(404).json({ error: "Booking not found" });
-      const booking = bookingDoc.data()!;
-
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [{
-          price_data: {
-            currency: 'eur',
-            product_data: { name: booking.title },
-            unit_amount: Math.round(booking.amount * 100),
-          },
-          quantity: 1,
-        }],
-        mode: 'payment',
-        success_url: `${process.env.APP_URL || 'http://localhost:3000'}/payment-success?bookingId=${bookingId}`,
-        cancel_url: `${process.env.APP_URL || 'http://localhost:3000'}/payment-cancel`,
-        metadata: { bookingId }
-      });
-      res.json({ url: session.url });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      await firestore.collection('users').doc(req.params.id).update({ role });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user role" });
     }
   });
 
-  app.get("/api/health", (req, res) => res.json({ status: "ok" }));
+  app.post("/api/admin/listings", authenticateToken, isAdminMiddleware, async (req, res) => {
+    const { id, type, name, title, location, price, stars, rating, description, image, category, price_level } = req.body;
+    const tableMap: any = { tour: 'tours', restaurant: 'restaurants', hotel: 'hotels', taxi: 'taxi', experience: 'experiences', rental: 'rentals', event: 'events' };
+    const collectionName = tableMap[type];
+    if (!collectionName) return res.status(400).json({ error: "Invalid type" });
 
-  // Finalize Express Export for Vercel
+    const finalTitle = title || name;
+    const finalRating = rating || stars || 5;
+    const data = {
+      title: finalTitle,
+      location,
+      city: location,
+      price: Number(price),
+      rating: Number(finalRating),
+      stars: Math.round(Number(finalRating)),
+      description,
+      image,
+      category,
+      price_level,
+      updatedAt: new Date().toISOString()
+    };
+
+    try {
+      if (id) {
+        await firestore.collection(collectionName).doc(id).update(data);
+      } else {
+        const docRef = firestore.collection(collectionName).doc();
+        await docRef.set({ id: docRef.id, ...data, createdAt: new Date().toISOString() });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save listing" });
+    }
+  });
+
+  app.get("/api/admin/logs", authenticateToken, isAdminMiddleware, async (req, res) => {
+    try {
+      const snapshot = await firestore.collection('activity_logs')
+        .orderBy('created_at', 'desc')
+        .limit(100)
+        .get();
+      
+      const logs = await Promise.all(snapshot.docs.map(async (logDoc) => {
+        const log = logDoc.data();
+        const userDoc = await firestore.collection('users').doc(log.user_id).get();
+        const userData = userDoc.data() || {};
+        return {
+          ...log,
+          user_name: userData.name || 'Unknown',
+          user_email: userData.email || 'Unknown'
+        };
+      }));
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch logs" });
+    }
+  });
+
+  app.get("/api/admin/logs/activity", authenticateToken, isAdminMiddleware, async (req, res) => {
+    try {
+      const snapshot = await firestore.collection('activity_logs')
+        .orderBy('created_at', 'desc')
+        .limit(100)
+        .get();
+      
+      const logs = await Promise.all(snapshot.docs.map(async (logDoc) => {
+        const log = logDoc.data();
+        const userDoc = await firestore.collection('users').doc(log.user_id).get();
+        const userData = userDoc.data() || {};
+        return {
+          ...log,
+          user_name: userData.name || 'Unknown',
+          user_email: userData.email || 'Unknown'
+        };
+      }));
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch activity logs" });
+    }
+  });
+
+  app.get("/api/admin/logs/admin", authenticateToken, isAdminMiddleware, (req, res) => {
+    // For now return empty as we don't have a separate admin_logs table yet
+    res.json([]);
+  });
+
+  app.get("/api/admin/analytics/activity", authenticateToken, isAdminMiddleware, async (req, res) => {
+    try {
+      const snapshot = await firestore.collection('activity_logs').orderBy('created_at', 'desc').limit(100).get();
+      const logs = snapshot.docs.map(doc => doc.data());
+      
+      // Group by date for stats
+      const statsMap = new Map();
+      logs.forEach((log: any) => {
+        const date = log.created_at.split('T')[0];
+        statsMap.set(date, (statsMap.get(date) || 0) + 1);
+      });
+      
+      const stats = Array.from(statsMap.entries()).map(([date, count]) => ({ date, count }));
+      res.json(stats.reverse());
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  app.get("/api/admin/messages", authenticateToken, isAdminMiddleware, async (req, res) => {
+    try {
+      const snapshot = await firestore.collection('admin_messages').orderBy('created_at', 'asc').limit(100).get();
+      const messages = await Promise.all(snapshot.docs.map(async (doc) => {
+        const msg = doc.data();
+        const userDoc = await firestore.collection('users').doc(msg.sender_id).get();
+        return { ...msg, sender_name: userDoc.data()?.name || 'Unknown', avatar_url: userDoc.data()?.avatar_url };
+      }));
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch admin messages" });
+    }
+  });
+
+  app.post("/api/admin/messages", authenticateToken, isAdminMiddleware, async (req: any, res) => {
+    const { message } = req.body;
+    try {
+      const msgRef = firestore.collection('admin_messages').doc();
+      const newMessage = {
+        id: msgRef.id,
+        sender_id: req.user.id,
+        message,
+        created_at: new Date().toISOString()
+      };
+      await msgRef.set(newMessage);
+      
+      const userDoc = await firestore.collection('users').doc(req.user.id).get();
+      const messageWithUser = { ...newMessage, sender_name: userDoc.data()?.name || 'Unknown', avatar_url: userDoc.data()?.avatar_url };
+      
+      // Broadcast to other admins
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({ type: 'admin_chat', message: messageWithUser }));
+        }
+      });
+      
+      res.json(messageWithUser);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send admin message" });
+    }
+  });
+
+  app.delete("/api/admin/listings/:id", authenticateToken, isAdminMiddleware, async (req, res) => {
+    const { id } = req.params;
+    const { type } = req.query; // Need type to know which collection
+    const tableMap: any = { tour: 'tours', restaurant: 'restaurants', hotel: 'hotels', taxi: 'taxi', experience: 'experiences', rental: 'rentals', event: 'events' };
+    const collectionName = tableMap[type as string];
+    
+    if (!collectionName) return res.status(400).json({ error: "Invalid type" });
+    
+    try {
+      await firestore.collection(collectionName).doc(id).delete();
+      notifyAdmins('system', `Listing ID ${id} was deleted by ${(req as any).user.name}`);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete listing" });
+    }
+  });
+
+  // Offers & Game
+  app.get("/api/offers", authenticateToken, (req, res) => {
+    const offers = [
+      { id: 'o1', title: '10% Off Next Ride', description: 'Get 10% off your next luxury transport.', cost: 500, code: 'RIDE10' },
+      { id: 'o2', title: 'Free Dessert', description: 'Complimentary dessert at any partner restaurant.', cost: 300, code: 'SWEET' },
+      { id: 'o3', title: 'VIP Lounge Access', description: 'Access to exclusive airport lounges.', cost: 1000, code: 'VIP' },
+    ];
+    res.json(offers);
+  });
+
+  app.post("/api/redeem", authenticateToken, async (req: any, res) => {
+    const { offerId, cost } = req.body;
+    try {
+      const userRef = firestore.collection('users').doc(req.user.id);
+      const userDoc = await userRef.get();
+      const userData = userDoc.data();
+      
+      if (!userData || userData.bonus < cost) return res.status(400).json({ error: "Insufficient points" });
+      
+      await userRef.update({ bonus: userData.bonus - cost });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to redeem offer" });
+    }
+  });
+
+  app.post("/api/game-win", authenticateToken, async (req: any, res) => {
+    try {
+      const userRef = firestore.collection('users').doc(req.user.id);
+      const userDoc = await userRef.get();
+      const userData = userDoc.data();
+      await userRef.update({ 
+        last_game_win: new Date().toISOString(), 
+        bonus: (userData?.bonus || 0) + 50 
+      });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update game win" });
+    }
+  });
+
+  app.post("/api/log-activity", authenticateToken, async (req: any, res) => {
+    const { action, page, details } = req.body;
+    try {
+      const logRef = firestore.collection('activity_logs').doc();
+      await logRef.set({
+        id: logRef.id,
+        user_id: req.user.id,
+        action: action || 'UI_ACTION',
+        page: page || 'unknown',
+        details: details ? JSON.stringify(details) : null,
+        ip: req.ip,
+        user_agent: req.get('user-agent'),
+        created_at: new Date().toISOString()
+      });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to log activity" });
+    }
+  });
+
+  // Social & Learning Extras
+  app.get("/api/friends", authenticateToken, (req, res) => res.json([]));
+  app.get("/api/mentors", authenticateToken, (req, res) => res.json([]));
+  app.post("/api/mentors/follow", authenticateToken, (req, res) => res.json({ success: true }));
+  app.get("/api/tasks", authenticateToken, (req, res) => res.json([]));
+  app.get("/api/search", async (req, res) => {
+    const { q } = req.query;
+    try {
+      // Simple search across all listings
+      const allListings = await Promise.all([
+        fetchListings('tours', 'tour'),
+        fetchListings('restaurants', 'restaurant'),
+        fetchListings('hotels', 'hotel')
+      ]);
+      const flattened = allListings.flat();
+      const filtered = flattened.filter((l: any) => 
+        (l.name || '').toLowerCase().includes(String(q).toLowerCase()) ||
+        (l.description || '').toLowerCase().includes(String(q).toLowerCase())
+      );
+      res.json(filtered);
+    } catch (error) {
+      res.status(500).json({ error: "Search failed" });
+    }
+  });
+
+  // User Profile
+  app.post("/api/user/profile", authenticateToken, async (req: any, res) => {
+    const { name, avatar_url } = req.body;
+    try {
+      await firestore.collection('users').doc(req.user.id).update({
+        name,
+        avatar_url
+      });
+      const userDoc = await firestore.collection('users').doc(req.user.id).get();
+      res.json(userDoc.data());
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Bookings
+  app.get("/api/bookings", authenticateToken, async (req: any, res) => {
+    try {
+      const snapshot = await firestore.collection('bookings')
+        .where('user_id', '==', req.user.id)
+        .orderBy('created_at', 'desc')
+        .get();
+      const bookings = snapshot.docs.map(doc => doc.data());
+      res.json(bookings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch bookings" });
+    }
+  });
+
+  // Suggestions
+  app.get("/api/suggestions", authenticateToken, async (req, res) => {
+    try {
+      // Fetch some popular items as suggestions
+      const [tours, restaurants, hotels] = await Promise.all([
+        fetchListings('tours', 'tour'),
+        fetchListings('restaurants', 'restaurant'),
+        fetchListings('hotels', 'hotel')
+      ]);
+      const all = [...tours, ...restaurants, ...hotels];
+      // Randomly pick 4
+      const shuffled = all.sort(() => 0.5 - Math.random());
+      res.json(shuffled.slice(0, 4));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch suggestions" });
+    }
+  });
+
+  app.post("/api/report-error", async (req, res) => {
+    console.error("Client-side error reported:", req.body);
+    res.json({ success: true });
+  });
+
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
+  });
+
+  app.get("/api/:type/:id", async (req, res) => {
+    const { type, id } = req.params;
+    const tableMap: any = { 
+      tours: 'tours', 
+      restaurants: 'restaurants', 
+      hotels: 'hotels', 
+      taxi: 'taxi',
+      experiences: 'experiences',
+      rentals: 'rentals',
+      events: 'events'
+    };
+    const collectionName = tableMap[type];
+    if (!collectionName) return res.status(404).json({ error: "Not found" });
+    
+    try {
+      const doc = await firestore.collection(collectionName).doc(id).get();
+      if (!doc.exists) return res.status(404).json({ error: "Not found" });
+      
+      const item = doc.data();
+      const reviewsSnapshot = await firestore.collection('reviews')
+        .where('listing_id', '==', id)
+        .where('listing_type', '==', type.slice(0, -1))
+        .orderBy('created_at', 'desc')
+        .get();
+      const reviews = reviewsSnapshot.docs.map(d => d.data());
+      
+      res.json({ ...item, reviews });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch item" });
+    }
+  });
+
+  // Vite Integration & Static Files
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: "spa" });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(__dirname, "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => res.sendFile(path.resolve(distPath, "index.html")));
+    app.use(express.static(path.join(__dirname, "dist")));
+    app.get("*", (req, res) => res.sendFile(path.join(__dirname, "dist", "index.html")));
   }
 
-  return app;
+  // Graceful shutdown
+  const shutdown = () => {
+    console.log('Closing server...');
+    server.close(() => {
+      process.exit(0);
+    });
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+
+  server.listen(PORT, "0.0.0.0", async () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+    
+    // Test Firestore connection
+    try {
+      const testSnapshot = await firestore.collection('hotels').limit(1).get();
+      console.log(`Firestore connection test successful. Found ${testSnapshot.size} hotels.`);
+    } catch (e) {
+      console.error("Firestore connection test failed:", e);
+    }
+  });
 }
 
-const appPromise = startServer();
-export default appPromise;
+startServer();

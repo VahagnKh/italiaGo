@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import { LayoutDashboard, List, Calendar, Users, Plus, Trash2, Edit, CheckCircle2, XCircle, TrendingUp, DollarSign, ShoppingBag } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const AdminDashboardPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<any>(null);
   const [listings, setListings] = useState([]);
@@ -16,7 +16,7 @@ const AdminDashboardPage: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user) return;
+      if (!user || userData?.role !== 'admin') return;
       setLoading(true);
       try {
         const token = await user.getIdToken();
@@ -47,7 +47,22 @@ const AdminDashboardPage: React.FC = () => {
       }
     };
     fetchData();
-  }, [user]);
+  }, [user, userData]);
+
+  if (!user || userData?.role !== 'admin') {
+    return (
+      <div className="flex flex-col min-h-screen bg-stone-50">
+        <Navbar onAuthClick={() => {}} onAIClick={() => {}} onAdminClick={() => {}} />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold text-stone-900">Access Denied</h2>
+            <p className="text-stone-600">You must be an admin to view this page.</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
@@ -58,7 +73,11 @@ const AdminDashboardPage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-stone-50">
-      <Navbar />
+      <Navbar 
+        onAuthClick={() => {}} 
+        onAIClick={() => {}} 
+        onAdminClick={() => setActiveTab('overview')} 
+      />
       
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col md:flex-row gap-8">

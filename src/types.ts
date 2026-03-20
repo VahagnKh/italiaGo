@@ -1,21 +1,35 @@
-export interface User {
-  id: number;
+export interface AppUser {
+  uid: string;
   email: string;
   name: string;
-  wallet_balance: number;
+  role: 'user' | 'admin';
   bonus: number;
   avatar_url?: string;
+  status?: string;
+  last_game_win?: string;
+}
+
+export interface Favorite {
+  id: string;
+  userId: string;
+  itemId: string;
+  itemType: string;
+  name: string;
+  image_url: string;
+  location: string;
+  type: string;
 }
 
 export interface Booking {
-  id: number;
-  user_id: number;
-  type: 'hotel' | 'restaurant' | 'tour' | 'taxi';
-  item_name: string;
-  details: string;
+  id: string;
+  userId: string;
+  type: 'hotel' | 'restaurant' | 'tour' | 'taxi' | 'experience' | 'rental' | 'event';
+  itemId: string;
+  itemName: string;
   amount: number;
-  status: string;
-  created_at: string;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  createdAt: any;
+  details?: any;
 }
 
 export interface Destination {

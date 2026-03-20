@@ -85,7 +85,7 @@ const ListingDetailPage: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar />
+      <Navbar onAuthClick={() => {}} onAIClick={() => {}} onAdminClick={() => {}} />
       
       <main className="flex-grow bg-white">
         {/* Header & Gallery */}

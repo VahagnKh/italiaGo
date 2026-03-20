@@ -283,7 +283,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
     } catch (e) { console.error(e); }
   };
 
-  const handleUpdateRole = async (userId: number, role: string) => {
+  const handleUpdateRole = async (userId: string, role: string) => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/admin/users/${userId}/role`, {
@@ -298,7 +298,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
     } catch (e) { console.error(e); }
   };
 
-  const handleToggleUserStatus = async (userId: number, currentDisabled: boolean) => {
+  const handleToggleUserStatus = async (userId: string, currentDisabled: boolean) => {
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`/api/admin/users/${userId}/status`, {
@@ -411,44 +411,70 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 bg-[#f4f6f9] z-[100] flex overflow-hidden font-sans text-[#343a40]"
     >
       {/* Sidebar */}
-      <aside className={`bg-[#343a40] text-[#c2c7d0] transition-all duration-300 flex flex-col z-20 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
-        <div className="h-14 flex items-center px-4 border-b border-[#4b545c]">
-          <div className="w-8 h-8 bg-gold rounded-full flex items-center justify-center text-white font-bold shrink-0">A</div>
-          {isSidebarOpen && <span className="ml-3 text-xl font-light text-white">AdminLTE 4</span>}
+      <aside className={`bg-[#1a1c23] text-[#94a3b8] transition-all duration-300 flex flex-col z-20 border-r border-white/5 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+        <div className="h-16 flex items-center px-6 border-b border-white/5">
+          <div className="w-9 h-9 bg-gradient-to-br from-gold to-amber-600 rounded-xl flex items-center justify-center text-white font-bold shrink-0 shadow-lg shadow-gold/20">I</div>
+          {isSidebarOpen && (
+            <div className="ml-3 overflow-hidden">
+              <span className="text-lg font-display italic text-white block leading-none">ItaliaGo</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold">Admin Panel</span>
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto py-4">
-          <div className="px-4 mb-4 pb-4 border-b border-[#4b545c] flex items-center">
-            <div className="w-8 h-8 rounded-full bg-paper/20 overflow-hidden shrink-0">
-              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="User" />
+        <div className="flex-1 overflow-y-auto py-6 no-scrollbar">
+          <div className="px-6 mb-8 flex items-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 p-0.5 shrink-0 shadow-inner">
+              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${localStorage.getItem('userEmail') || 'Admin'}`} alt="User" className="w-full h-full rounded-[10px] object-cover" />
             </div>
-            {isSidebarOpen && <span className="ml-3 text-sm">Alexander Pierce</span>}
+            {isSidebarOpen && (
+              <div className="ml-3 overflow-hidden">
+                <span className="text-sm font-medium text-white block truncate">Alexander Pierce</span>
+                <span className="text-[10px] text-emerald-500 flex items-center gap-1 font-bold uppercase tracking-wider">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Online
+                </span>
+              </div>
+            )}
           </div>
 
-          <nav className="px-2 space-y-1">
+          <nav className="px-3 space-y-1.5">
             {menuItems.map((item) => (
               <div key={item.id}>
                 <button
                   onClick={() => item.children ? toggleMenu(item.id) : setActiveMenu(item.id)}
-                  className={`w-full flex items-center px-3 py-2 rounded text-sm transition-colors hover:bg-white/10 hover:text-white ${activeMenu.startsWith(item.id) ? 'bg-gold text-white' : ''}`}
+                  className={`w-full flex items-center px-4 py-2.5 rounded-xl text-sm transition-all duration-200 group ${
+                    activeMenu.startsWith(item.id) 
+                      ? 'bg-gold text-white shadow-lg shadow-gold/20' 
+                      : 'hover:bg-white/5 hover:text-white'
+                  }`}
                 >
-                  <item.icon size={18} className="shrink-0" />
+                  <item.icon size={18} className={`shrink-0 ${activeMenu.startsWith(item.id) ? 'text-white' : 'text-slate-400 group-hover:text-gold transition-colors'}`} />
                   {isSidebarOpen && (
                     <>
-                      <span className="ml-3 flex-1 text-left">{item.label}</span>
-                      {item.children && (expandedMenus.includes(item.id) ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+                      <span className="ml-3 flex-1 text-left font-medium">{item.label}</span>
+                      {item.children && (
+                        <motion.div
+                          animate={{ rotate: expandedMenus.includes(item.id) ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <ChevronDown size={14} className="opacity-40" />
+                        </motion.div>
+                      )}
                     </>
                   )}
                 </button>
                 {isSidebarOpen && item.children && expandedMenus.includes(item.id) && (
-                  <div className="mt-1 ml-4 space-y-1">
+                  <div className="mt-1.5 ml-4 space-y-1 pl-4 border-l border-white/10">
                     {item.children.map((child) => (
                       <button
                         key={child.id}
                         onClick={() => setActiveMenu(child.id)}
-                        className={`w-full flex items-center px-3 py-2 rounded text-sm transition-colors hover:bg-white/10 hover:text-white ${activeMenu === child.id ? 'bg-white/10 text-white' : ''}`}
+                        className={`w-full flex items-center px-4 py-2 rounded-lg text-xs transition-all duration-200 ${
+                          activeMenu === child.id 
+                            ? 'text-gold font-bold' 
+                            : 'text-slate-400 hover:text-white hover:translate-x-1'
+                        }`}
                       >
-                        <div className={`w-1.5 h-1.5 rounded-full border border-current mr-3 ${activeMenu === child.id ? 'bg-current' : ''}`} />
                         {child.label}
                       </button>
                     ))}
@@ -457,6 +483,16 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
               </div>
             ))}
           </nav>
+        </div>
+
+        <div className="p-4 border-t border-white/5">
+          <button 
+            onClick={onClose}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-slate-400 hover:bg-rose-500/10 hover:text-rose-500 transition-all group"
+          >
+            <LogOut size={18} className="group-hover:rotate-12 transition-transform" />
+            {isSidebarOpen && <span className="font-medium">Sign Out</span>}
+          </button>
         </div>
       </aside>
 
@@ -544,23 +580,23 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
           {activeMenu.startsWith('dashboard') && (
             <div className="space-y-6">
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {stats.map((stat) => (
-                  <div key={stat.label} className={`${stat.color} text-white rounded shadow-sm overflow-hidden relative group`}>
-                    <div className="p-4 md:p-5 flex justify-between">
+                  <div key={stat.label} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-all group relative overflow-hidden">
+                    <div className="relative z-10 flex justify-between items-start">
                       <div className="space-y-1">
-                        <h3 className="text-3xl font-bold">{stat.value}</h3>
-                        <p className="text-sm opacity-80">{stat.label}</p>
-                        <div className="flex items-center gap-1 text-[10px] font-bold">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{stat.label}</p>
+                        <h3 className="text-3xl font-display text-slate-900">{stat.value}</h3>
+                        <div className={`flex items-center gap-1 text-[10px] font-bold ${stat.trendUp ? 'text-emerald-500' : 'text-rose-500'}`}>
                           {stat.trendUp ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                          {stat.trend} Since last month
+                          {stat.trend} <span className="text-slate-400 font-normal">vs last month</span>
                         </div>
                       </div>
-                      <stat.icon size={56} className="opacity-20 absolute right-2 top-2 group-hover:scale-110 transition-transform" />
+                      <div className={`w-12 h-12 ${stat.color.replace('bg-', 'bg-opacity-10 text-')} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                        <stat.icon size={24} />
+                      </div>
                     </div>
-                    <button className="w-full bg-black/10 py-1 text-xs flex items-center justify-center gap-1 hover:bg-black/20 transition-colors">
-                      More info <Plus size={12} />
-                    </button>
+                    <div className={`absolute bottom-0 left-0 h-1 ${stat.color} w-0 group-hover:w-full transition-all duration-500`} />
                   </div>
                 ))}
               </div>
@@ -767,6 +803,62 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                               </button>
                             </div>
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bookings Management View */}
+          {activeMenu === 'bookings' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-border flex justify-between items-center bg-[#f8f9fa]">
+                  <h3 className="font-bold text-sm">Booking Management</h3>
+                  <div className="flex gap-2">
+                    <button onClick={fetchAllBookings} className="p-2 hover:bg-paper rounded-lg transition-colors"><RefreshCw size={16} /></button>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-[#f8f9fa] border-b border-border">
+                        <th className="px-4 py-3 font-bold">Booking ID</th>
+                        <th className="px-4 py-3 font-bold">User</th>
+                        <th className="px-4 py-3 font-bold">Listing</th>
+                        <th className="px-4 py-3 font-bold">Dates</th>
+                        <th className="px-4 py-3 font-bold">Status</th>
+                        <th className="px-4 py-3 font-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {allBookings.map((booking) => (
+                        <tr key={booking.id} className="hover:bg-[#f8f9fa]">
+                          <td className="px-4 py-3 font-mono text-xs text-[#6c757d]">{booking.id.slice(0, 8)}...</td>
+                          <td className="px-4 py-3">
+                            <p className="font-bold">{booking.user_name}</p>
+                            <p className="text-xs text-[#6c757d]">{booking.user_email}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{booking.listing_name || 'Listing'}</p>
+                            <p className="text-[10px] uppercase text-[#6c757d]">{booking.listing_type}</p>
+                          </td>
+                          <td className="px-4 py-3 text-xs">
+                            <div className="flex items-center gap-1"><Calendar size={12} /> {booking.start_date} - {booking.end_date}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                              booking.status === 'confirmed' ? 'bg-emerald-100 text-emerald-600' : 
+                              booking.status === 'pending' ? 'bg-amber-100 text-amber-600' : 
+                              'bg-gray-100 text-gray-600'
+                            }`}>
+                              {booking.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 font-bold">€{booking.total_price}</td>
                         </tr>
                       ))}
                     </tbody>
