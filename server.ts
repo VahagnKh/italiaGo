@@ -6,10 +6,10 @@ import { fileURLToPath } from "url";
 import { WebSocketServer, WebSocket } from "ws";
 import session from "express-session";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import helmet from "helmet";
 import cors from "cors";
 import Stripe from "stripe";
+import admin from "firebase-admin";
 
 import { initializeApp, getApps } from "firebase/app";
 import { 
@@ -31,7 +31,13 @@ import {
 } from "firebase/firestore";
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 
-const JWT_SECRET = process.env.JWT_SECRET || "italiago-jwt-secret-2026";
+// Initialize Firebase Admin SDK
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId,
+  });
+}
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock");
 
 // Initialize Firebase Client SDK
@@ -40,20 +46,12 @@ const firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 declare module "express-session" {
   interface SessionData {
-    userId: number;
+    userId: string;
   }
 }
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// SQLite is deprecated in favor of Firestore for Vercel compatibility
-// const db = new Database("italiago.db");
-// db.pragma('journal_mode = WAL');
-
-// SQLite initialization removed for Vercel/Firestore compatibility
-
-// Migrations removed
 
 async function startServer() {
   const app = express();
@@ -162,24 +160,33 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
   
-  // Authentication Middleware
-  const authenticateToken = (req: any, res: any, next: any) => {
+  // Authentication Middleware using Firebase Admin
+  const authenticateToken = async (req: any, res: any, next: any) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     
     if (!token || token === 'null' || token === 'undefined') {
-      console.warn(`Auth failed: No or invalid token for ${req.path}`);
       return res.status(401).json({ error: "Authentication required" });
     }
     
-    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-      if (err) {
-        console.error(`Auth failed: Invalid token for ${req.path}`, err.message);
-        return res.status(403).json({ error: "Invalid token" });
-      }
-      req.user = user;
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      
+      // Fetch user data from Firestore to get the role
+      const userDoc = await getDoc(doc(firestore, 'users', decodedToken.uid));
+      const userData = userDoc.exists() ? userDoc.data() : null;
+      
+      req.user = {
+        id: decodedToken.uid,
+        email: decodedToken.email,
+        name: decodedToken.name || userData?.name,
+        role: userData?.role || 'user'
+      };
       next();
-    });
+    } catch (err: any) {
+      console.error(`Auth failed: Invalid token for ${req.path}`, err.message);
+      return res.status(403).json({ error: "Invalid token" });
+    }
   };
 
   const isAdminMiddleware = (req: any, res: any, next: any) => {
@@ -215,61 +222,42 @@ async function startServer() {
 
 // seedData removed
 
-  // Authentication Routes
-  app.post("/api/register", async (req, res) => {
+// Seed Admin Route - FOR DEVELOPMENT ONLY
+  app.post("/api/admin/seed", async (req, res) => {
     const { email, password, name } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: "Missing fields" });
+    
     try {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const userRef = doc(collection(firestore, 'users'));
-      const user = { 
-        id: userRef.id, 
-        email, 
-        password: hashedPassword, 
-        name, 
-        role: 'user',
-        wallet_balance: 0,
+      // Create user in Firebase Auth
+      const userRecord = await admin.auth().createUser({
+        email,
+        password,
+        displayName: name,
+      });
+      
+      // Create user in Firestore
+      const userRef = doc(firestore, 'users', userRecord.uid);
+      await setDoc(userRef, {
+        id: userRecord.uid,
+        email,
+        name,
+        role: 'admin',
+        wallet_balance: 1000,
         bonus: 0,
         status: 'Normal',
         created_at: new Date().toISOString()
-      };
-      await setDoc(userRef, user);
+      });
       
-      const { password: _, ...userToReturn } = user;
-      const token = jwt.sign(userToReturn, JWT_SECRET, { expiresIn: '7d' });
-      res.json({ user: userToReturn, token });
-    } catch (err) {
-      console.error("Registration Error:", err);
-      res.status(400).json({ error: "Email already exists or registration failed" });
+      res.json({ message: "Admin seeded successfully", uid: userRecord.uid });
+    } catch (error: any) {
+      console.error("Seed Admin Error:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
-  app.post("/api/login", async (req, res) => {
-    const { email, password } = req.body;
-    try {
-      const q = query(collection(firestore, 'users'), where('email', '==', email), limit(1));
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) {
-        return res.status(401).json({ error: "Invalid credentials" });
-      }
-      
-      const userDoc = snapshot.docs[0];
-      const user = userDoc.data() as any;
-      
-      if (user && await bcrypt.compare(password, user.password)) {
-        const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-        const { password: _, ...userToReturn } = user;
-        console.log(`User logged in: ${user.email} (ID: ${user.id}, Role: ${user.role})`);
-        res.json({ user: userToReturn, token });
-      } else {
-        res.status(401).json({ error: "Invalid credentials" });
-      }
-    } catch (error) {
-      console.error("Login Error:", error);
-      res.status(500).json({ error: "Internal Server Error" });
-    }
-  });
-
+  // Authentication Routes - Handled by Firebase Auth on frontend
+  // Backend only verifies ID tokens via authenticateToken middleware
+  
   app.get("/api/users/me", authenticateToken, async (req: any, res) => {
     try {
       const userDoc = await getDoc(doc(firestore, 'users', req.user.id));
@@ -337,7 +325,36 @@ async function startServer() {
   app.get("/api/rentals", async (req, res) => res.json(await fetchListings('rentals', 'rental')));
   app.get("/api/events", async (req, res) => res.json(await fetchListings('events', 'event')));
 
-  app.get("/api/admin/seed", async (req, res) => {
+  app.get("/api/listings/:id", async (req, res) => {
+    const { id } = req.params;
+    const collections = ['hotels', 'restaurants', 'experiences', 'tours', 'rentals', 'events', 'taxi'];
+    
+    try {
+      for (const col of collections) {
+        const docRef = doc(firestore, col, id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          
+          // Fetch reviews
+          const q = query(
+            collection(firestore, 'reviews'),
+            where('listing_id', '==', id)
+          );
+          const reviewsSnapshot = await getDocs(q);
+          const reviews = reviewsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          
+          return res.json({ id: docSnap.id, ...data, reviews, category: col });
+        }
+      }
+      res.status(404).json({ error: "Listing not found" });
+    } catch (error) {
+      console.error("Error fetching listing:", error);
+      res.status(500).json({ error: "Internal Server Error" });
+    }
+  });
+
+  app.get("/api/admin/seed-data", authenticateToken, isAdminMiddleware, async (req, res) => {
     const seedData = {
       hotels: [
         {

@@ -13,9 +13,11 @@ interface AuthContextType {
   user: User | null;
   userData: AppUser | null;
   loading: boolean;
+  token: string | null;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updateProfile: (data: Partial<AppUser>) => Promise<void>;
+  fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,12 +25,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<AppUser | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let unsubscribeUserData: (() => void) | undefined;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       
       if (unsubscribeUserData) {
@@ -36,6 +39,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (currentUser) {
+        const idToken = await currentUser.getIdToken();
+        setToken(idToken);
+
         unsubscribeUserData = onSnapshot(doc(db, 'users', currentUser.uid), (doc) => {
           if (doc.exists()) {
             setUserData(doc.data() as AppUser);
@@ -48,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setLoading(false);
         });
       } else {
+        setToken(null);
         setUserData(null);
         setLoading(false);
       }
@@ -73,11 +80,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     const { updateDoc, doc } = await import('firebase/firestore');
     await updateDoc(doc(db, 'users', user.uid), data);
-    // No need to manually set userData here as onSnapshot will handle it
+  };
+
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const currentToken = user ? await user.getIdToken() : null;
+    const headers = {
+      ...options.headers,
+      'Authorization': currentToken ? `Bearer ${currentToken}` : '',
+      'Content-Type': 'application/json',
+    };
+    return fetch(url, { ...options, headers });
   };
 
   return (
-    <AuthContext.Provider value={{ user, userData, loading, logout, resetPassword, updateProfile }}>
+    <AuthContext.Provider value={{ user, userData, loading, token, logout, resetPassword, updateProfile, fetchWithAuth }}>
       {children}
     </AuthContext.Provider>
   );

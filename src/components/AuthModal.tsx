@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { User, Mail, Lock, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Mail, Lock, X, ArrowRight } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -21,6 +23,37 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess }) => {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Create Firestore user document if it doesn't exist
+      await setDoc(doc(db, 'users', user.uid), {
+        id: user.uid,
+        email: user.email,
+        name: user.displayName || 'User',
+        role: 'user',
+        wallet_balance: 0,
+        bonus: 0,
+        status: 'Normal',
+        avatar_url: user.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}`,
+        created_at: new Date().toISOString()
+      }, { merge: true });
+
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error('Google Auth error:', err);
+      setError(err.message || 'Google Sign-In failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,13 +72,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess }) => {
         
         // Create Firestore user document
         await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
+          id: user.uid,
           email: user.email,
           name: name,
           role: 'user',
+          wallet_balance: 0,
           bonus: 0,
+          status: 'Normal',
           avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-          createdAt: new Date().toISOString()
+          created_at: new Date().toISOString()
         });
       }
       
@@ -72,75 +107,97 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess }) => {
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative w-full max-w-md bg-card rounded-[2rem] overflow-hidden shadow-2xl p-6 sm:p-8 space-y-6 sm:space-y-8 mx-4"
+        className="relative w-full max-w-md glass-light rounded-[2.5rem] overflow-hidden shadow-2xl p-8 sm:p-12 space-y-8 mx-4"
       >
         <div className="text-center space-y-2">
+          <div className="w-16 h-16 bg-ink text-paper rounded-2xl flex items-center justify-center font-display text-3xl italic mx-auto mb-6 shadow-xl">
+            I
+          </div>
           <h2 className="text-3xl sm:text-4xl font-display italic text-ink">
             {mode === 'login' ? 'Welcome Back' : 'Join ItaliaGo'}
           </h2>
-          <p className="text-ink/60 text-sm">
+          <p className="text-ink/60 text-sm italic">
             {mode === 'login' ? 'Sign in to access your luxury travel suite.' : 'Create an account for exclusive Italian experiences.'}
           </p>
         </div>
 
-        <div className="flex p-1 bg-paper rounded-full">
+        <div className="flex p-1 bg-paper/50 rounded-full border border-border">
           <button 
             onClick={() => setMode('login')}
-            className={`flex-1 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${mode === 'login' ? 'bg-card shadow-sm text-ink' : 'text-ink/40'}`}
+            className={`flex-1 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'login' ? 'bg-white shadow-sm text-ink' : 'text-ink/40'}`}
           >
             Login
           </button>
           <button 
             onClick={() => setMode('register')}
-            className={`flex-1 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-card shadow-sm text-ink' : 'text-ink/40'}`}
+            className={`flex-1 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-white shadow-sm text-ink' : 'text-ink/40'}`}
           >
             Register
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {mode === 'register' && (
-            <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
-              <input 
-                type="text" 
-                placeholder="Full Name" 
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink transition-all" 
-              />
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Full Name</label>
+              <div className="relative">
+                <User className="absolute left-5 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="John Doe" 
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-paper/50 border border-border rounded-2xl pl-14 pr-6 py-4 outline-none focus:ring-2 focus:ring-gold text-ink transition-all" 
+                />
+              </div>
             </div>
           )}
-          <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
-            <input 
-              type="email" 
-              placeholder="Email Address" 
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink transition-all" 
-            />
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink transition-all" 
-            />
+          
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Email Address</label>
+            <div className="relative">
+              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
+              <input 
+                type="email" 
+                placeholder="john@example.com" 
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-paper/50 border border-border rounded-2xl pl-14 pr-6 py-4 outline-none focus:ring-2 focus:ring-gold text-ink transition-all" 
+              />
+            </div>
           </div>
 
-          {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
+              <input 
+                type="password" 
+                placeholder="••••••••" 
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-paper/50 border border-border rounded-2xl pl-14 pr-6 py-4 outline-none focus:ring-2 focus:ring-gold text-ink transition-all" 
+              />
+            </div>
+          </div>
+
+          {error && (
+            <motion.p 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-red-500 text-[10px] text-center font-bold uppercase tracking-widest"
+            >
+              {error}
+            </motion.p>
+          )}
 
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full btn-luxury py-4 flex items-center justify-center gap-3"
+            className="w-full btn-luxury py-5 flex items-center justify-center gap-3 shadow-xl"
           >
             {loading ? (
               <motion.div 
@@ -149,14 +206,34 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess }) => {
                 className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
               />
             ) : (
-              mode === 'login' ? 'Sign In' : 'Create Account'
+              <>
+                {mode === 'login' ? 'Sign In' : 'Create Account'}
+                <ArrowRight size={18} />
+              </>
             )}
           </button>
         </form>
 
+        <div className="relative py-2">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border"></div>
+          </div>
+          <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-widest">
+            <span className="bg-transparent px-4 text-ink/40">Or continue with</span>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleGoogleSignIn}
+          className="w-full flex items-center justify-center gap-4 bg-white border border-border rounded-2xl py-4 hover:bg-paper transition-all group shadow-sm"
+        >
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/action/google.svg" alt="Google" className="w-5 h-5" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-ink">Google Account</span>
+        </button>
+
         <button 
           onClick={onClose}
-          className="w-full text-xs font-bold uppercase tracking-widest text-ink/40 hover:text-ink transition-colors"
+          className="w-full text-[10px] font-bold uppercase tracking-widest text-ink/40 hover:text-ink transition-colors"
         >
           Cancel
         </button>

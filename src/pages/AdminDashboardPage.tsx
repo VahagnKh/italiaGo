@@ -6,7 +6,7 @@ import { LayoutDashboard, List, Calendar, Users, Plus, Trash2, Edit, CheckCircle
 import { motion } from 'motion/react';
 
 const AdminDashboardPage: React.FC = () => {
-  const { user, userData } = useAuth();
+  const { user, userData, fetchWithAuth } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState<any>(null);
   const [listings, setListings] = useState([]);
@@ -19,14 +19,11 @@ const AdminDashboardPage: React.FC = () => {
       if (!user || userData?.role !== 'admin') return;
       setLoading(true);
       try {
-        const token = await user.getIdToken();
-        const headers = { 'Authorization': `Bearer ${token}` };
-
         const [statsRes, listingsRes, bookingsRes, usersRes] = await Promise.all([
-          fetch('/api/admin/stats', { headers }),
-          fetch('/api/listings', { headers }),
-          fetch('/api/admin/bookings', { headers }),
-          fetch('/api/admin/users', { headers })
+          fetchWithAuth('/api/admin/stats'),
+          fetchWithAuth('/api/listings'),
+          fetchWithAuth('/api/admin/bookings'),
+          fetchWithAuth('/api/admin/users')
         ]);
 
         const [statsData, listingsData, bookingsData, usersData] = await Promise.all([

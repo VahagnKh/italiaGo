@@ -7,6 +7,7 @@
   --font-sans: "Inter", sans-serif;
 
   --color-gold: #D4AF37;
+  --color-gold-light: #F1E5AC;
   --color-paper: var(--bg);
   --color-ink: var(--text);
   --color-card: var(--card-bg);
@@ -53,19 +54,56 @@
 .luxury-card {
   background-color: var(--card-bg);
   border-color: var(--card-border);
-  @apply rounded-2xl shadow-sm border overflow-hidden transition-all duration-500 hover:shadow-md hover:-translate-y-1;
+  @apply rounded-[2rem] shadow-sm border overflow-hidden transition-all duration-700 hover:shadow-2xl hover:-translate-y-2;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .glass {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass-light {
+  background: rgba(20, 20, 20, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.text-glow {
+  text-shadow: 0 0 30px rgba(212, 175, 55, 0.4);
 }
 
 .btn-luxury {
   background-color: var(--btn-bg);
   color: var(--btn-text);
-  @apply px-6 py-3 rounded-full font-medium transition-all duration-500 hover:opacity-90 active:scale-95;
+  @apply px-10 py-4 rounded-full font-bold uppercase tracking-[0.2em] text-[10px] transition-all duration-500 hover:opacity-90 active:scale-95 shadow-xl shadow-black/10;
 }
 
 .btn-outline {
   border-color: var(--text);
   color: var(--text);
-  @apply px-6 py-3 border rounded-full font-medium transition-all duration-500 hover:bg-ink hover:text-paper active:scale-95;
+  @apply px-10 py-4 border rounded-full font-bold uppercase tracking-[0.2em] text-[10px] transition-all duration-500 hover:bg-ink hover:text-paper active:scale-95;
+}
+
+.ken-burns {
+  animation: kenburns 20s ease infinite alternate;
+}
+
+@keyframes kenburns {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.15); }
 }
 
 .no-scrollbar::-webkit-scrollbar {

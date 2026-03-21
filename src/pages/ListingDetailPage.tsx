@@ -4,12 +4,12 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import { Star, MapPin, Calendar, Users, Heart, Share2, ArrowLeft, CheckCircle2, ShieldCheck, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const ListingDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, fetchWithAuth } = useAuth();
   const [listing, setListing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookingDate, setBookingDate] = useState('');
@@ -19,7 +19,7 @@ const ListingDetailPage: React.FC = () => {
   useEffect(() => {
     const fetchListing = async () => {
       try {
-        const res = await fetch(`/api/listings/${id}`); // Note: server.ts has /api/:type/:id, but I'll adjust it
+        const res = await fetch(`/api/listings/${id}`);
         const data = await res.json();
         setListing(data);
       } catch (error) {
@@ -44,13 +44,8 @@ const ListingDetailPage: React.FC = () => {
 
     setBookingLoading(true);
     try {
-      const token = await user.getIdToken();
-      const res = await fetch('/api/bookings', {
+      const res = await fetchWithAuth('/api/bookings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           listing_id: id,
           listing_type: listing.category,

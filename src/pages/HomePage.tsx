@@ -86,82 +86,135 @@ const HomePage: React.FC = () => {
   return (
     <div className="space-y-20 pb-20">
       {/* Hero */}
-      <section className="relative h-[85vh] flex items-center justify-center overflow-hidden">
-        <img 
-          src="https://picsum.photos/seed/italy-hero/1920/1080" 
-          alt="Italy" 
-          className="absolute inset-0 w-full h-full object-cover"
-          referrerPolicy="no-referrer"
-        />
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="relative z-10 text-center text-white space-y-6 px-6 max-w-4xl">
-          <motion.h1 
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-3xl sm:text-6xl md:text-8xl font-display italic leading-tight"
+      <section className="relative h-screen flex items-center justify-center overflow-hidden">
+        {/* Cinematic Video Background */}
+        <div className="absolute inset-0 z-0">
+          <video 
+            autoPlay 
+            muted 
+            loop 
+            playsInline 
+            className="w-full h-full object-cover scale-105"
+            poster="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=1920"
           >
-            {t.discover}
-          </motion.h1>
-          <motion.p 
+            <source 
+              src="https://player.vimeo.com/external/434045526.sd.mp4?s=c27ee348587d5906d54958d0e881715a221fd861&profile_id=164&oauth2_token_id=57447761" 
+              type="video/mp4" 
+            />
+          </video>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-bg" />
+        </div>
+        
+        <div className="relative z-10 text-center text-white space-y-8 px-6 max-w-5xl">
+          <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-lg sm:text-xl md:text-2xl font-light tracking-wide opacity-90"
+            transition={{ duration: 1.2, ease: "easeOut" }}
+            className="space-y-4"
+          >
+            <motion.span 
+              initial={{ letterSpacing: "0.2em", opacity: 0 }}
+              animate={{ letterSpacing: "0.4em", opacity: 1 }}
+              transition={{ duration: 1.5, delay: 0.5 }}
+              className="text-gold font-bold uppercase text-xs sm:text-sm block"
+            >
+              Benvenuti in Italia
+            </motion.span>
+            <h1 className="text-5xl sm:text-7xl md:text-9xl font-display italic leading-tight text-glow">
+              {t.discover}
+            </h1>
+          </motion.div>
+
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1, duration: 1.5 }}
+            className="text-lg sm:text-xl md:text-2xl font-light tracking-wide opacity-80 max-w-2xl mx-auto leading-relaxed"
           >
             {t.companion}
           </motion.p>
+
           <motion.div 
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="pt-8"
+            transition={{ delay: 1.5, duration: 1 }}
+            className="pt-8 flex flex-col sm:flex-row items-center justify-center gap-6"
           >
-            <motion.button 
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              animate={{ 
-                boxShadow: ["0px 0px 0px rgba(212, 175, 55, 0)", "0px 0px 20px rgba(212, 175, 55, 0.3)", "0px 0px 0px rgba(212, 175, 55, 0)"]
-              }}
-              transition={{ 
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
+            <button 
               onClick={() => {
                 const el = document.getElementById('services');
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }} 
-              className="group px-10 py-4 bg-ink text-paper rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl flex items-center gap-3 mx-auto"
+              className="btn-luxury group flex items-center gap-4"
             >
               {t.start}
-              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-            </motion.button>
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            
+            <button 
+              onClick={() => navigate('/discover')}
+              className="px-8 py-4 rounded-full border border-white/30 backdrop-blur-md hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest"
+            >
+              Explore Destinations
+            </button>
           </motion.div>
         </div>
+
+        {/* Scroll Indicator */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 2.5, duration: 1 }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+        >
+          <span className="text-[8px] font-bold uppercase tracking-[0.3em] text-white/40">Scroll</span>
+          <motion.div 
+            animate={{ y: [0, 10, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="w-px h-12 bg-gradient-to-b from-white/40 to-transparent" 
+          />
+        </motion.div>
       </section>
 
       {/* Services */}
-      <section id="services" className="max-w-7xl mx-auto px-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
-        {[
-          { icon: Hotel, label: t.hotels, color: 'bg-blue-50 dark:bg-blue-900/20', path: '/hotels' },
-          { icon: Utensils, label: t.restaurants, color: 'bg-orange-50 dark:bg-orange-900/20', path: '/restaurants' },
-          { icon: Sparkles, label: t.experiences, color: 'bg-yellow-50 dark:bg-yellow-900/20', path: '/experiences' },
-          { icon: Compass, label: t.tours, color: 'bg-emerald-50 dark:bg-emerald-900/20', path: '/tours' },
-          { icon: Car, label: t.rentals, color: 'bg-red-50 dark:bg-red-900/20', path: '/rentals' },
-          { icon: MapIcon, label: t.taxi, color: 'bg-purple-50 dark:bg-purple-900/20', path: '/taxi' },
-        ].map((item, i) => (
-          <motion.div 
-            key={i}
-            whileHover={{ y: -5 }}
-            onClick={() => navigate(item.path)}
-            className="luxury-card p-8 flex flex-col items-center text-center space-y-4 cursor-pointer"
-          >
-            <div className={`w-16 h-16 ${item.color} rounded-2xl flex items-center justify-center text-ink`}>
-              <item.icon size={32} />
-            </div>
-            <h3 className="font-bold text-lg uppercase tracking-widest text-ink">{item.label}</h3>
-          </motion.div>
-        ))}
+      <section id="services" className="max-w-7xl mx-auto px-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center space-y-4 mb-16"
+        >
+          <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]">What We Offer</span>
+          <h2 className="text-4xl md:text-6xl font-display italic">Luxury Services</h2>
+        </motion.div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+          {[
+            { icon: Hotel, label: t.hotels, color: 'bg-blue-50/50 dark:bg-blue-900/10', path: '/hotels' },
+            { icon: Utensils, label: t.restaurants, color: 'bg-orange-50/50 dark:bg-orange-900/10', path: '/restaurants' },
+            { icon: Sparkles, label: t.experiences, color: 'bg-yellow-50/50 dark:bg-yellow-900/10', path: '/experiences' },
+            { icon: Compass, label: t.tours, color: 'bg-emerald-50/50 dark:bg-emerald-900/10', path: '/tours' },
+            { icon: Car, label: t.rentals, color: 'bg-red-50/50 dark:bg-red-900/10', path: '/rentals' },
+            { icon: MapIcon, label: t.taxi, color: 'bg-purple-50/50 dark:bg-purple-900/10', path: '/taxi' },
+          ].map((item, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              whileHover={{ y: -10 }}
+              onClick={() => navigate(item.path)}
+              className="luxury-card p-8 flex flex-col items-center text-center space-y-4 cursor-pointer group"
+            >
+              <div className={`w-16 h-16 ${item.color} rounded-2xl flex items-center justify-center text-ink group-hover:bg-gold group-hover:text-white transition-all duration-500`}>
+                <item.icon size={32} />
+              </div>
+              <h3 className="font-bold text-[10px] uppercase tracking-widest text-ink group-hover:text-gold transition-colors">{item.label}</h3>
+            </motion.div>
+          ))}
+        </div>
       </section>
 
       {/* Suggestions */}
@@ -171,32 +224,48 @@ const HomePage: React.FC = () => {
 
       {/* Destinations */}
       <section id="destinations" className="max-w-7xl mx-auto px-6 space-y-12">
-        <div className="flex justify-between items-end">
-          <div className="space-y-2">
-            <h2 className="text-4xl md:text-5xl font-display italic text-ink">{t.featured}</h2>
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="flex flex-col md:flex-row md:items-end justify-between gap-8"
+        >
+          <div className="space-y-4">
+            <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]">Curated Selection</span>
+            <h2 className="text-4xl md:text-6xl font-display italic text-ink">{t.featured}</h2>
             <p className="text-ink/60 italic">Handpicked escapes for the discerning traveler.</p>
           </div>
-          <button onClick={() => navigate('/discover')} className="btn-outline flex items-center gap-2">
-            View All <ArrowRight size={16} />
+          <button onClick={() => navigate('/discover')} className="btn-outline flex items-center gap-2 group">
+            View All <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
           </button>
-        </div>
+        </motion.div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {DESTINATIONS.map((dest) => (
+          {DESTINATIONS.map((dest, index) => (
             <motion.div 
               key={dest.id}
-              whileHover={{ scale: 1.02 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ y: -10 }}
               onClick={() => {
                 navigate(`/discover?search=${dest.name}`);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="group relative h-[500px] rounded-3xl overflow-hidden shadow-lg cursor-pointer"
             >
-              <img src={dest.image || undefined} alt={dest.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-              <div className="absolute bottom-0 p-8 text-white space-y-2">
+              <img 
+                src={dest.image || undefined} 
+                alt={dest.name} 
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" 
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
+              <div className="absolute bottom-0 p-8 text-white space-y-3 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-gold">{dest.tagline}</span>
-                <h3 className="text-3xl font-display">{dest.name}</h3>
-                <p className="text-sm opacity-80 font-light leading-relaxed">
+                <h3 className="text-4xl font-display italic">{dest.name}</h3>
+                <p className="text-sm opacity-0 group-hover:opacity-80 font-light leading-relaxed transition-opacity duration-500 line-clamp-2">
                   <TranslatedText text={dest.description} lang={lang} />
                 </p>
               </div>
@@ -242,24 +311,45 @@ const HomePage: React.FC = () => {
 
       {/* Newsletter */}
       <section className="max-w-7xl mx-auto px-6 pb-20">
-        <div className="bg-ink rounded-[3rem] p-12 md:p-24 text-center text-white space-y-8 relative overflow-hidden">
-          <div className="absolute inset-0 opacity-20">
-            <img src="https://picsum.photos/seed/newsletter-bg/1920/1080" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-          </div>
-          <div className="relative z-10 space-y-6 max-w-2xl mx-auto">
-            <h2 className="text-4xl md:text-6xl font-display italic">Join the Inner Circle</h2>
-            <p className="text-white/60 text-lg font-light">Receive exclusive offers, travel tips, and early access to new experiences.</p>
+        <motion.div 
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="bg-ink rounded-[3rem] p-12 md:p-24 text-center text-white space-y-8 relative overflow-hidden group"
+        >
+          <motion.div 
+            initial={{ scale: 1.2 }}
+            whileInView={{ scale: 1 }}
+            transition={{ duration: 2 }}
+            className="absolute inset-0 opacity-30"
+          >
+            <img src="https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&q=80&w=1920" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          </motion.div>
+          <div className="absolute inset-0 bg-gradient-to-b from-ink/80 via-ink/40 to-ink/80" />
+          
+          <div className="relative z-10 space-y-8 max-w-2xl mx-auto">
+            <div className="space-y-4">
+              <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]">Exclusive Access</span>
+              <h2 className="text-5xl md:text-7xl font-display italic">Join the Inner Circle</h2>
+              <p className="text-white/60 text-lg font-light leading-relaxed">Receive curated travel inspiration, exclusive offers, and early access to our most prestigious experiences.</p>
+            </div>
+            
             <div className="flex flex-col md:flex-row gap-4 pt-4">
-              <input type="email" placeholder="Your email address" className="flex-1 bg-white/10 border border-white/20 rounded-full px-8 py-4 outline-none focus:ring-2 focus:ring-gold transition-all" />
+              <input 
+                type="email" 
+                placeholder="Your email address" 
+                className="flex-1 bg-white/5 border border-white/10 rounded-full px-8 py-5 outline-none focus:ring-2 focus:ring-gold transition-all backdrop-blur-md" 
+              />
               <button 
                 onClick={() => addNotification('Welcome to the Inner Circle!', 'success')}
-                className="btn-luxury px-12 py-4"
+                className="btn-luxury px-12 py-5"
               >
                 Subscribe
               </button>
             </div>
+            <p className="text-[10px] text-white/30 uppercase tracking-widest">By subscribing, you agree to our privacy policy.</p>
           </div>
-        </div>
+        </motion.div>
       </section>
     </div>
   );
