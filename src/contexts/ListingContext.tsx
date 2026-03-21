@@ -57,8 +57,8 @@ export const ListingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       let allListings: Listing[] = [];
       const collections = category && category !== 'all' 
-        ? [category === 'taxi' ? 'taxi_services' : category] 
-        : ['hotels', 'restaurants', 'experiences', 'tours', 'rentals', 'events', 'taxi_services'];
+        ? [category] 
+        : ['hotels', 'restaurants', 'experiences', 'tours', 'rentals', 'events', 'taxi'];
 
       for (const colName of collections) {
         let q = query(collection(db, colName), orderBy('created_at', 'desc'));
@@ -71,7 +71,7 @@ export const ListingProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const colListings = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          type: colName === 'taxi_services' ? 'taxi' : colName.slice(0, -1)
+          type: colName.slice(0, -1)
         })) as Listing[];
         
         allListings = [...allListings, ...colListings];
@@ -86,7 +86,7 @@ export const ListingProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const getListingById = async (id: string, type: string) => {
-    const colName = type === 'taxi' ? 'taxi_services' : type + 's';
+    const colName = type === 'taxi' ? 'taxi' : type + 's';
     const docRef = doc(db, colName, id);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {

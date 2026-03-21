@@ -11,23 +11,32 @@ import helmet from "helmet";
 import cors from "cors";
 import Stripe from "stripe";
 
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getFirestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
+import { initializeApp, getApps } from "firebase/app";
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  limit, 
+  orderBy, 
+  addDoc, 
+  writeBatch,
+  deleteDoc,
+  Timestamp
+} from "firebase/firestore";
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 
 const JWT_SECRET = process.env.JWT_SECRET || "italiago-jwt-secret-2026";
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock");
 
-// Initialize Firebase Admin
-if (!getApps().length) {
-  initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
-}
-
-const firestore = getFirestore(firebaseConfig.firestoreDatabaseId);
-const auth = getAuth();
+// Initialize Firebase Client SDK
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 declare module "express-session" {
   interface SessionData {
@@ -64,8 +73,8 @@ async function startServer() {
     };
     
     try {
-      const docRef = firestore.collection('notifications').doc();
-      await docRef.set({ id: docRef.id, ...notification });
+      const docRef = doc(collection(firestore, 'notifications'));
+      await setDoc(docRef, { id: docRef.id, ...notification });
       
       const wsMessage = JSON.stringify({ type: 'notification', notification: { id: docRef.id, ...notification }, details });
       adminClients.forEach(client => {
@@ -186,8 +195,8 @@ async function startServer() {
     const user = req.user;
     if (user && req.method !== 'GET' && !req.path.startsWith('/api/admin')) {
       try {
-        const logRef = firestore.collection('activity_logs').doc();
-        await logRef.set({
+        const logRef = doc(collection(firestore, 'activity_logs'));
+        await setDoc(logRef, {
           id: logRef.id,
           user_id: user.id,
           action: req.method,
@@ -212,7 +221,7 @@ async function startServer() {
     if (!email || !password || !name) return res.status(400).json({ error: "Missing fields" });
     try {
       const hashedPassword = await bcrypt.hash(password, 10);
-      const userRef = firestore.collection('users').doc();
+      const userRef = doc(collection(firestore, 'users'));
       const user = { 
         id: userRef.id, 
         email, 
@@ -224,7 +233,7 @@ async function startServer() {
         status: 'Normal',
         created_at: new Date().toISOString()
       };
-      await userRef.set(user);
+      await setDoc(userRef, user);
       
       const { password: _, ...userToReturn } = user;
       const token = jwt.sign(userToReturn, JWT_SECRET, { expiresIn: '7d' });
@@ -238,13 +247,14 @@ async function startServer() {
   app.post("/api/login", async (req, res) => {
     const { email, password } = req.body;
     try {
-      const snapshot = await firestore.collection('users').where('email', '==', email).limit(1).get();
+      const q = query(collection(firestore, 'users'), where('email', '==', email), limit(1));
+      const snapshot = await getDocs(q);
       if (snapshot.empty) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
       
       const userDoc = snapshot.docs[0];
-      const user = userDoc.data();
+      const user = userDoc.data() as any;
       
       if (user && await bcrypt.compare(password, user.password)) {
         const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
@@ -262,8 +272,8 @@ async function startServer() {
 
   app.get("/api/users/me", authenticateToken, async (req: any, res) => {
     try {
-      const userDoc = await firestore.collection('users').doc(req.user.id).get();
-      if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+      const userDoc = await getDoc(doc(firestore, 'users', req.user.id));
+      if (!userDoc.exists()) return res.status(404).json({ error: "User not found" });
       const { password: _, ...user } = userDoc.data() as any;
       res.json(user);
     } catch (error) {
@@ -273,8 +283,8 @@ async function startServer() {
 
   app.get("/api/user", authenticateToken, async (req: any, res) => {
     try {
-      const userDoc = await firestore.collection('users').doc(req.user.id).get();
-      if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+      const userDoc = await getDoc(doc(firestore, 'users', req.user.id));
+      if (!userDoc.exists()) return res.status(404).json({ error: "User not found" });
       const { password: _, ...user } = userDoc.data() as any;
       res.json(user);
     } catch (error) {
@@ -285,15 +295,17 @@ async function startServer() {
   // Firestore Listings Fetcher
   const fetchListings = async (collectionName: string, type: string) => {
     try {
-      const snapshot = await firestore.collection(collectionName).get();
+      const snapshot = await getDocs(collection(firestore, collectionName));
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       // Fetch reviews for each item to calculate average rating
       const listingsWithRatings = await Promise.all(items.map(async (item: any) => {
-        const reviewsSnapshot = await firestore.collection('reviews')
-          .where('listing_id', '==', item.id)
-          .where('listing_type', '==', type)
-          .get();
+        const q = query(
+          collection(firestore, 'reviews'),
+          where('listing_id', '==', item.id),
+          where('listing_type', '==', type)
+        );
+        const reviewsSnapshot = await getDocs(q);
         
         const reviews = reviewsSnapshot.docs.map(doc => doc.data());
         const avgRating = reviews.length > 0 
@@ -325,6 +337,137 @@ async function startServer() {
   app.get("/api/rentals", async (req, res) => res.json(await fetchListings('rentals', 'rental')));
   app.get("/api/events", async (req, res) => res.json(await fetchListings('events', 'event')));
 
+  app.get("/api/admin/seed", async (req, res) => {
+    const seedData = {
+      hotels: [
+        {
+          title: "Grand Hotel Roma",
+          description: "Luxury hotel in the heart of Rome with stunning views of the Colosseum.",
+          price: 250,
+          location: "Rome",
+          image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800",
+          rating: 4.8,
+          type: "hotel",
+          created_at: new Date().toISOString()
+        },
+        {
+          title: "Venice Canal Suites",
+          description: "Elegant suites overlooking the Grand Canal.",
+          price: 320,
+          location: "Venice",
+          image: "https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&q=80&w=800",
+          rating: 4.9,
+          type: "hotel",
+          created_at: new Date().toISOString()
+        }
+      ],
+      restaurants: [
+        {
+          title: "La Pergola",
+          description: "Three-star Michelin restaurant with panoramic views of Rome.",
+          price: 150,
+          location: "Rome",
+          image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&q=80&w=800",
+          rating: 4.9,
+          type: "restaurant",
+          created_at: new Date().toISOString()
+        },
+        {
+          title: "Osteria Francescana",
+          description: "World-renowned contemporary Italian cuisine in Modena.",
+          price: 200,
+          location: "Modena",
+          image: "https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&q=80&w=800",
+          rating: 5.0,
+          type: "restaurant",
+          created_at: new Date().toISOString()
+        }
+      ],
+      tours: [
+        {
+          title: "Colosseum & Roman Forum Tour",
+          description: "Skip-the-line guided tour of Rome's most iconic ancient sites.",
+          price: 55,
+          location: "Rome",
+          image: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?auto=format&fit=crop&q=80&w=800",
+          rating: 4.7,
+          type: "tour",
+          created_at: new Date().toISOString()
+        },
+        {
+          title: "Tuscany Wine Tasting",
+          description: "Full-day tour through the rolling hills of Chianti with wine tastings.",
+          price: 120,
+          location: "Florence",
+          image: "https://images.unsplash.com/photo-1516594915697-87eb3b1c14ea?auto=format&fit=crop&q=80&w=800",
+          rating: 4.9,
+          type: "tour",
+          created_at: new Date().toISOString()
+        }
+      ],
+      experiences: [
+        {
+          title: "Pasta Making Class",
+          description: "Learn to make authentic Italian pasta from scratch with a local chef.",
+          price: 75,
+          location: "Florence",
+          image: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&q=80&w=800",
+          rating: 4.8,
+          type: "experience",
+          created_at: new Date().toISOString()
+        }
+      ],
+      rentals: [
+        {
+          title: "Vespa Primavera Rental",
+          description: "Explore the streets of Rome like a local on a classic Vespa.",
+          price: 45,
+          location: "Rome",
+          image: "https://images.unsplash.com/photo-1519641471654-76ce0107ad1b?auto=format&fit=crop&q=80&w=800",
+          rating: 4.6,
+          type: "rental",
+          created_at: new Date().toISOString()
+        }
+      ],
+      events: [
+        {
+          title: "Verona Opera Festival",
+          description: "Experience world-class opera in the ancient Roman Arena di Verona.",
+          price: 85,
+          location: "Verona",
+          image: "https://images.unsplash.com/photo-1514302240736-b1fee5989461?auto=format&fit=crop&q=80&w=800",
+          rating: 4.9,
+          type: "event",
+          created_at: new Date().toISOString()
+        }
+      ],
+      taxi: [
+        {
+          title: "Rome Airport Transfer",
+          description: "Private luxury transfer from Fiumicino Airport to Rome city center.",
+          price: 60,
+          location: "Rome",
+          image: "https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&q=80&w=800",
+          rating: 4.7,
+          type: "taxi",
+          created_at: new Date().toISOString()
+        }
+      ]
+    };
+
+    try {
+      for (const [collectionName, items] of Object.entries(seedData)) {
+        const colRef = collection(firestore, collectionName);
+        for (const item of items) {
+          await addDoc(colRef, item);
+        }
+      }
+      res.json({ message: "Seed completed successfully!" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/listings", async (req, res) => {
     try {
       const [tours, restaurants, hotels, taxi, experiences, rentals, events] = await Promise.all([
@@ -347,7 +490,7 @@ async function startServer() {
     const finalId = listing_id || itemId;
     const finalType = listing_type || type;
     try {
-      const reviewRef = firestore.collection('reviews').doc();
+      const reviewRef = doc(collection(firestore, 'reviews'));
       const newReview = {
         id: reviewRef.id,
         user_id: req.user.id,
@@ -359,7 +502,7 @@ async function startServer() {
         user_name: req.user.name || 'Anonymous',
         created_at: new Date().toISOString()
       };
-      await reviewRef.set(newReview);
+      await setDoc(reviewRef, newReview);
       res.json(newReview);
     } catch (e: any) {
       console.error("Review Post Error:", e);
@@ -370,11 +513,13 @@ async function startServer() {
   app.get("/api/reviews/:itemId", async (req, res) => {
     const { type } = req.query;
     try {
-      const snapshot = await firestore.collection('reviews')
-        .where('listing_id', '==', req.params.itemId)
-        .where('listing_type', '==', type)
-        .orderBy('created_at', 'desc')
-        .get();
+      const q = query(
+        collection(firestore, 'reviews'),
+        where('listing_id', '==', req.params.itemId),
+        where('listing_type', '==', type),
+        orderBy('created_at', 'desc')
+      );
+      const snapshot = await getDocs(q);
       const reviews = snapshot.docs.map(doc => doc.data());
       res.json(reviews);
     } catch (e: any) {
@@ -388,7 +533,7 @@ async function startServer() {
     const finalId = listing_id || itemId;
     const finalType = listing_type || type;
     try {
-      const bookingRef = firestore.collection('bookings').doc();
+      const bookingRef = doc(collection(firestore, 'bookings'));
       const newBooking = {
         id: bookingRef.id,
         user_id: req.user.id,
@@ -400,7 +545,7 @@ async function startServer() {
         status: 'pending',
         created_at: new Date().toISOString()
       };
-      await bookingRef.set(newBooking);
+      await setDoc(bookingRef, newBooking);
       res.json(newBooking);
     } catch (e: any) {
       console.error("Booking Post Error:", e);
@@ -411,13 +556,14 @@ async function startServer() {
   // Admin Panel
   app.get("/api/admin/stats", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const usersSnapshot = await firestore.collection('users').get();
-      const bookingsSnapshot = await firestore.collection('bookings').get();
-      const confirmedBookings = await firestore.collection('bookings').where('status', '==', 'confirmed').get();
+      const usersSnapshot = await getDocs(collection(firestore, 'users'));
+      const bookingsSnapshot = await getDocs(collection(firestore, 'bookings'));
+      const q = query(collection(firestore, 'bookings'), where('status', '==', 'confirmed'));
+      const confirmedBookings = await getDocs(q);
       
       const users = usersSnapshot.size;
       const bookings = bookingsSnapshot.size;
-      const revenue = confirmedBookings.docs.reduce((acc, doc) => acc + (doc.data().amount || 0), 0);
+      const revenue = confirmedBookings.docs.reduce((acc, doc) => acc + ((doc.data() as any).amount || 0), 0);
       
       res.json({ users, bookings, revenue });
     } catch (error) {
@@ -428,7 +574,8 @@ async function startServer() {
 
   app.get("/api/admin/notifications", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('notifications').orderBy('created_at', 'desc').limit(50).get();
+      const q = query(collection(firestore, 'notifications'), orderBy('created_at', 'desc'), limit(50));
+      const snapshot = await getDocs(q);
       const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(notifications);
     } catch (error) {
@@ -439,8 +586,9 @@ async function startServer() {
 
   app.post("/api/admin/notifications/read", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('notifications').where('read', '==', 0).get();
-      const batch = firestore.batch();
+      const q = query(collection(firestore, 'notifications'), where('read', '==', 0));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(firestore);
       snapshot.docs.forEach(doc => {
         batch.update(doc.ref, { read: 1 });
       });
@@ -454,11 +602,12 @@ async function startServer() {
 
   app.get("/api/admin/bookings", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('bookings').orderBy('created_at', 'desc').get();
-      const bookings = await Promise.all(snapshot.docs.map(async (doc) => {
-        const booking = doc.data();
-        const userDoc = await firestore.collection('users').doc(booking.user_id).get();
-        const userData = userDoc.data() || {};
+      const q = query(collection(firestore, 'bookings'), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
+      const bookings = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+        const booking = docSnapshot.data() as any;
+        const userDoc = await getDoc(doc(firestore, 'users', booking.user_id));
+        const userData = (userDoc.exists() ? userDoc.data() : {}) as any;
         return {
           ...booking,
           user_name: userData.name || 'Unknown',
@@ -474,10 +623,10 @@ async function startServer() {
 
   app.get("/api/admin/listings", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const collections = ['tours', 'restaurants', 'hotels', 'taxi_services', 'experiences', 'rentals', 'events'];
-      const results = await Promise.all(collections.map(async (col) => {
-        const snapshot = await firestore.collection(col).get();
-        return snapshot.docs.map(doc => ({ ...doc.data(), type: col.replace('_services', '').slice(0, -1) }));
+      const collectionsList = ['tours', 'restaurants', 'hotels', 'taxi', 'experiences', 'rentals', 'events'];
+      const results = await Promise.all(collectionsList.map(async (col) => {
+        const snapshot = await getDocs(collection(firestore, col));
+        return snapshot.docs.map(doc => ({ ...doc.data(), type: col.slice(0, -1) }));
       }));
       res.json(results.flat());
     } catch (error) {
@@ -489,7 +638,7 @@ async function startServer() {
   // Learning Platform Routes
   app.get("/api/courses", async (req, res) => {
     try {
-      const snapshot = await firestore.collection('courses').get();
+      const snapshot = await getDocs(collection(firestore, 'courses'));
       const courses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(courses);
     } catch (error) {
@@ -499,10 +648,11 @@ async function startServer() {
 
   app.get("/api/courses/:id", async (req, res) => {
     try {
-      const courseDoc = await firestore.collection('courses').doc(req.params.id).get();
-      if (!courseDoc.exists) return res.status(404).json({ error: "Course not found" });
+      const courseDoc = await getDoc(doc(firestore, 'courses', req.params.id));
+      if (!courseDoc.exists()) return res.status(404).json({ error: "Course not found" });
       
-      const lessonsSnapshot = await firestore.collection('courses').doc(req.params.id).collection('lessons').orderBy('order_index', 'asc').get();
+      const q = query(collection(firestore, 'courses', req.params.id, 'lessons'), orderBy('order_index', 'asc'));
+      const lessonsSnapshot = await getDocs(q);
       const lessons = lessonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       res.json({ id: courseDoc.id, ...courseDoc.data(), lessons });
@@ -513,9 +663,8 @@ async function startServer() {
 
   app.get("/api/user/progress", authenticateToken, async (req: any, res) => {
     try {
-      const snapshot = await firestore.collection('user_progress')
-        .where('user_id', '==', req.user.id)
-        .get();
+      const q = query(collection(firestore, 'user_progress'), where('user_id', '==', req.user.id));
+      const snapshot = await getDocs(q);
       const progress = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(progress);
     } catch (error) {
@@ -527,17 +676,14 @@ async function startServer() {
   // Messages
   app.get("/api/messages", authenticateToken, async (req: any, res) => {
     try {
-      const snapshot = await firestore.collection('messages')
-        .where('receiver_id', '==', req.user.id)
-        .orderBy('created_at', 'desc')
-        .get();
-      const sentSnapshot = await firestore.collection('messages')
-        .where('sender_id', '==', req.user.id)
-        .orderBy('created_at', 'desc')
-        .get();
+      const qReceived = query(collection(firestore, 'messages'), where('receiver_id', '==', req.user.id), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(qReceived);
+      
+      const qSent = query(collection(firestore, 'messages'), where('sender_id', '==', req.user.id), orderBy('created_at', 'desc'));
+      const sentSnapshot = await getDocs(qSent);
         
       const messages = [...snapshot.docs, ...sentSnapshot.docs]
-        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .map(doc => ({ id: doc.id, ...doc.data() as any }))
         .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         
       res.json(messages);
@@ -549,8 +695,8 @@ async function startServer() {
   app.post("/api/messages", authenticateToken, async (req: any, res) => {
     const { receiverId, content } = req.body;
     try {
-      const messageRef = firestore.collection('messages').doc();
-      await messageRef.set({
+      const messageRef = doc(collection(firestore, 'messages'));
+      await setDoc(messageRef, {
         id: messageRef.id,
         sender_id: req.user.id,
         receiver_id: receiverId,
@@ -566,7 +712,7 @@ async function startServer() {
   // Admin Panel Extended
   app.get("/api/admin/users", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('users').get();
+      const snapshot = await getDocs(collection(firestore, 'users'));
       const users = snapshot.docs.map(doc => {
         const data = doc.data();
         const { password: _, ...user } = data as any;
@@ -582,7 +728,7 @@ async function startServer() {
   app.post("/api/admin/users/:id/status", authenticateToken, isAdminMiddleware, async (req, res) => {
     const { disabled } = req.body;
     try {
-      await firestore.collection('users').doc(req.params.id).update({ disabled: disabled ? 1 : 0 });
+      await updateDoc(doc(firestore, 'users', req.params.id), { disabled: disabled ? 1 : 0 });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update user status" });
@@ -592,7 +738,7 @@ async function startServer() {
   app.post("/api/admin/users/:id/role", authenticateToken, isAdminMiddleware, async (req, res) => {
     const { role } = req.body;
     try {
-      await firestore.collection('users').doc(req.params.id).update({ role });
+      await updateDoc(doc(firestore, 'users', req.params.id), { role });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to update user role" });
@@ -623,10 +769,10 @@ async function startServer() {
 
     try {
       if (id) {
-        await firestore.collection(collectionName).doc(id).update(data);
+        await updateDoc(doc(firestore, collectionName, id), data);
       } else {
-        const docRef = firestore.collection(collectionName).doc();
-        await docRef.set({ id: docRef.id, ...data, createdAt: new Date().toISOString() });
+        const docRef = doc(collection(firestore, collectionName));
+        await setDoc(docRef, { id: docRef.id, ...data, createdAt: new Date().toISOString() });
       }
       res.json({ success: true });
     } catch (error) {
@@ -636,15 +782,13 @@ async function startServer() {
 
   app.get("/api/admin/logs", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('activity_logs')
-        .orderBy('created_at', 'desc')
-        .limit(100)
-        .get();
+      const q = query(collection(firestore, 'activity_logs'), orderBy('created_at', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
       
       const logs = await Promise.all(snapshot.docs.map(async (logDoc) => {
-        const log = logDoc.data();
-        const userDoc = await firestore.collection('users').doc(log.user_id).get();
-        const userData = userDoc.data() || {};
+        const log = logDoc.data() as any;
+        const userDoc = await getDoc(doc(firestore, 'users', log.user_id));
+        const userData = (userDoc.exists() ? userDoc.data() : {}) as any;
         return {
           ...log,
           user_name: userData.name || 'Unknown',
@@ -659,14 +803,12 @@ async function startServer() {
 
   app.get("/api/admin/logs/activity", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('activity_logs')
-        .orderBy('created_at', 'desc')
-        .limit(100)
-        .get();
+      const q = query(collection(firestore, 'activity_logs'), orderBy('created_at', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
       
       const logs = await Promise.all(snapshot.docs.map(async (logDoc) => {
-        const log = logDoc.data();
-        const userDoc = await firestore.collection('users').doc(log.user_id).get();
+        const log = logDoc.data() as any;
+        const userDoc = await getDoc(doc(firestore, 'users', log.user_id));
         const userData = userDoc.data() || {};
         return {
           ...log,
@@ -687,7 +829,8 @@ async function startServer() {
 
   app.get("/api/admin/analytics/activity", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('activity_logs').orderBy('created_at', 'desc').limit(100).get();
+      const q = query(collection(firestore, 'activity_logs'), orderBy('created_at', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
       const logs = snapshot.docs.map(doc => doc.data());
       
       // Group by date for stats
@@ -706,10 +849,11 @@ async function startServer() {
 
   app.get("/api/admin/messages", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('admin_messages').orderBy('created_at', 'asc').limit(100).get();
-      const messages = await Promise.all(snapshot.docs.map(async (doc) => {
-        const msg = doc.data();
-        const userDoc = await firestore.collection('users').doc(msg.sender_id).get();
+      const q = query(collection(firestore, 'admin_messages'), orderBy('created_at', 'asc'), limit(100));
+      const snapshot = await getDocs(q);
+      const messages = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
+        const msg = docSnapshot.data() as any;
+        const userDoc = await getDoc(doc(firestore, 'users', msg.sender_id));
         return { ...msg, sender_name: userDoc.data()?.name || 'Unknown', avatar_url: userDoc.data()?.avatar_url };
       }));
       res.json(messages);
@@ -721,16 +865,16 @@ async function startServer() {
   app.post("/api/admin/messages", authenticateToken, isAdminMiddleware, async (req: any, res) => {
     const { message } = req.body;
     try {
-      const msgRef = firestore.collection('admin_messages').doc();
+      const msgRef = doc(collection(firestore, 'admin_messages'));
       const newMessage = {
         id: msgRef.id,
         sender_id: req.user.id,
         message,
         created_at: new Date().toISOString()
       };
-      await msgRef.set(newMessage);
+      await setDoc(msgRef, newMessage);
       
-      const userDoc = await firestore.collection('users').doc(req.user.id).get();
+      const userDoc = await getDoc(doc(firestore, 'users', req.user.id));
       const messageWithUser = { ...newMessage, sender_name: userDoc.data()?.name || 'Unknown', avatar_url: userDoc.data()?.avatar_url };
       
       // Broadcast to other admins
@@ -755,7 +899,7 @@ async function startServer() {
     if (!collectionName) return res.status(400).json({ error: "Invalid type" });
     
     try {
-      await firestore.collection(collectionName).doc(id).delete();
+      await deleteDoc(doc(firestore, collectionName, id));
       notifyAdmins('system', `Listing ID ${id} was deleted by ${(req as any).user.name}`);
       res.json({ success: true });
     } catch (error) {
@@ -776,13 +920,13 @@ async function startServer() {
   app.post("/api/redeem", authenticateToken, async (req: any, res) => {
     const { offerId, cost } = req.body;
     try {
-      const userRef = firestore.collection('users').doc(req.user.id);
-      const userDoc = await userRef.get();
-      const userData = userDoc.data();
+      const userRef = doc(firestore, 'users', req.user.id);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data() as any;
       
       if (!userData || userData.bonus < cost) return res.status(400).json({ error: "Insufficient points" });
       
-      await userRef.update({ bonus: userData.bonus - cost });
+      await updateDoc(userRef, { bonus: userData.bonus - cost });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to redeem offer" });
@@ -791,10 +935,10 @@ async function startServer() {
 
   app.post("/api/game-win", authenticateToken, async (req: any, res) => {
     try {
-      const userRef = firestore.collection('users').doc(req.user.id);
-      const userDoc = await userRef.get();
-      const userData = userDoc.data();
-      await userRef.update({ 
+      const userRef = doc(firestore, 'users', req.user.id);
+      const userDoc = await getDoc(userRef);
+      const userData = userDoc.data() as any;
+      await updateDoc(userRef, { 
         last_game_win: new Date().toISOString(), 
         bonus: (userData?.bonus || 0) + 50 
       });
@@ -807,8 +951,8 @@ async function startServer() {
   app.post("/api/log-activity", authenticateToken, async (req: any, res) => {
     const { action, page, details } = req.body;
     try {
-      const logRef = firestore.collection('activity_logs').doc();
-      await logRef.set({
+      const logRef = doc(collection(firestore, 'activity_logs'));
+      await setDoc(logRef, {
         id: logRef.id,
         user_id: req.user.id,
         action: action || 'UI_ACTION',
@@ -853,11 +997,12 @@ async function startServer() {
   app.post("/api/user/profile", authenticateToken, async (req: any, res) => {
     const { name, avatar_url } = req.body;
     try {
-      await firestore.collection('users').doc(req.user.id).update({
+      const userRef = doc(firestore, 'users', req.user.id);
+      await updateDoc(userRef, {
         name,
         avatar_url
       });
-      const userDoc = await firestore.collection('users').doc(req.user.id).get();
+      const userDoc = await getDoc(userRef);
       res.json(userDoc.data());
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -867,10 +1012,12 @@ async function startServer() {
   // Bookings
   app.get("/api/bookings", authenticateToken, async (req: any, res) => {
     try {
-      const snapshot = await firestore.collection('bookings')
-        .where('user_id', '==', req.user.id)
-        .orderBy('created_at', 'desc')
-        .get();
+      const q = query(
+        collection(firestore, 'bookings'),
+        where('user_id', '==', req.user.id),
+        orderBy('created_at', 'desc')
+      );
+      const snapshot = await getDocs(q);
       const bookings = snapshot.docs.map(doc => doc.data());
       res.json(bookings);
     } catch (error) {
@@ -897,7 +1044,7 @@ async function startServer() {
   });
 
   app.post("/api/report-error", async (req, res) => {
-    console.error("Client-side error reported:", req.body);
+    console.error("Client-side error reported:", JSON.stringify(req.body, null, 2));
     res.json({ success: true });
   });
 
@@ -920,15 +1067,17 @@ async function startServer() {
     if (!collectionName) return res.status(404).json({ error: "Not found" });
     
     try {
-      const doc = await firestore.collection(collectionName).doc(id).get();
-      if (!doc.exists) return res.status(404).json({ error: "Not found" });
+      const docSnapshot = await getDoc(doc(firestore, collectionName, id));
+      if (!docSnapshot.exists()) return res.status(404).json({ error: "Not found" });
       
-      const item = doc.data();
-      const reviewsSnapshot = await firestore.collection('reviews')
-        .where('listing_id', '==', id)
-        .where('listing_type', '==', type.slice(0, -1))
-        .orderBy('created_at', 'desc')
-        .get();
+      const item = docSnapshot.data() as any;
+      const q = query(
+        collection(firestore, 'reviews'),
+        where('listing_id', '==', id),
+        where('listing_type', '==', type.slice(0, -1)),
+        orderBy('created_at', 'desc')
+      );
+      const reviewsSnapshot = await getDocs(q);
       const reviews = reviewsSnapshot.docs.map(d => d.data());
       
       res.json({ ...item, reviews });
@@ -961,7 +1110,8 @@ async function startServer() {
     
     // Test Firestore connection
     try {
-      const testSnapshot = await firestore.collection('hotels').limit(1).get();
+      const q = query(collection(firestore, 'hotels'), limit(1));
+      const testSnapshot = await getDocs(q);
       console.log(`Firestore connection test successful. Found ${testSnapshot.size} hotels.`);
     } catch (e) {
       console.error("Firestore connection test failed:", e);
