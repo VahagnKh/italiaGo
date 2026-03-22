@@ -106,6 +106,20 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["user_id", "title", "text", "is_read", "created_at"]
+    },
+    "ClientError": {
+      "title": "ClientError",
+      "description": "Client-side error report",
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "stack": { "type": "string" },
+        "url": { "type": "string" },
+        "line": { "type": "number" },
+        "col": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["message", "created_at"]
     }
   },
   "firestore": {
@@ -164,6 +178,10 @@
     "/messages/{messageId}": {
       "schema": "Message",
       "description": "User messages"
+    },
+    "/client_errors/{errorId}": {
+      "schema": "ClientError",
+      "description": "Client-side error reports"
     }
   }
 }

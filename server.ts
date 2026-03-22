@@ -1061,7 +1061,22 @@ async function startServer() {
   });
 
   app.post("/api/report-error", async (req, res) => {
-    console.error("Client-side error reported:", JSON.stringify(req.body, null, 2));
+    const errorData = req.body;
+    console.error("Client-side error reported:", JSON.stringify(errorData, null, 2));
+    
+    try {
+      const errorRef = doc(collection(firestore, 'client_errors'));
+      await setDoc(errorRef, {
+        id: errorRef.id,
+        ...errorData,
+        created_at: new Date().toISOString(),
+        user_agent: req.get('user-agent'),
+        ip: req.ip
+      });
+    } catch (e) {
+      console.error("Failed to store client error in Firestore:", e);
+    }
+    
     res.json({ success: true });
   });
 

@@ -1,9 +1,12 @@
 export interface AppUser {
   uid: string;
+  id?: string; // Some parts use id instead of uid
   email: string;
   name: string;
   role: 'user' | 'admin';
   bonus: number;
+  wallet_balance?: number;
+  total_spent?: number;
   avatar_url?: string;
   status?: string;
   last_game_win?: string;

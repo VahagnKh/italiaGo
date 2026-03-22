@@ -89,19 +89,26 @@ const HomePage: React.FC = () => {
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
         {/* Cinematic Video Background */}
         <div className="absolute inset-0 z-0">
-          <video 
-            autoPlay 
-            muted 
-            loop 
-            playsInline 
-            className="w-full h-full object-cover scale-105"
-            poster="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=1920"
+          <motion.div 
+            initial={{ scale: 1.1 }}
+            animate={{ scale: 1 }}
+            transition={{ duration: 10, ease: "linear", repeat: Infinity, repeatType: "reverse" }}
+            className="w-full h-full"
           >
-            <source 
-              src="https://player.vimeo.com/external/434045526.sd.mp4?s=c27ee348587d5906d54958d0e881715a221fd861&profile_id=164&oauth2_token_id=57447761" 
-              type="video/mp4" 
-            />
-          </video>
+            <video 
+              autoPlay 
+              muted 
+              loop 
+              playsInline 
+              className="w-full h-full object-cover"
+              poster="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=1920"
+            >
+              <source 
+                src="https://player.vimeo.com/external/434045526.sd.mp4?s=c27ee348587d5906d54958d0e881715a221fd861&profile_id=164&oauth2_token_id=57447761" 
+                type="video/mp4" 
+              />
+            </video>
+          </motion.div>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-bg" />
         </div>
@@ -119,7 +126,7 @@ const HomePage: React.FC = () => {
               transition={{ duration: 1.5, delay: 0.5 }}
               className="text-gold font-bold uppercase text-xs sm:text-sm block"
             >
-              Benvenuti in Italia
+              <TranslatedText text="Benvenuti in Italia" lang={lang} />
             </motion.span>
             <h1 className="text-5xl sm:text-7xl md:text-9xl font-display italic leading-tight text-glow">
               {t.discover}
@@ -154,9 +161,9 @@ const HomePage: React.FC = () => {
             
             <button 
               onClick={() => navigate('/discover')}
-              className="px-8 py-4 rounded-full border border-white/30 backdrop-blur-md hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest"
+              className="px-10 py-5 rounded-full border-2 border-white/40 bg-white/10 backdrop-blur-md hover:bg-white hover:text-black transition-all text-xs font-bold uppercase tracking-widest shadow-2xl"
             >
-              Explore Destinations
+              <TranslatedText text="Explore Destinations" lang={lang} />
             </button>
           </motion.div>
         </div>
@@ -185,8 +192,8 @@ const HomePage: React.FC = () => {
           viewport={{ once: true }}
           className="text-center space-y-4 mb-16"
         >
-          <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]">What We Offer</span>
-          <h2 className="text-4xl md:text-6xl font-display italic">Luxury Services</h2>
+          <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]"><TranslatedText text="What We Offer" lang={lang} /></span>
+          <h2 className="text-4xl md:text-6xl font-display italic"><TranslatedText text="Luxury Services" lang={lang} /></h2>
         </motion.div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
@@ -231,12 +238,12 @@ const HomePage: React.FC = () => {
           className="flex flex-col md:flex-row md:items-end justify-between gap-8"
         >
           <div className="space-y-4">
-            <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]">Curated Selection</span>
+            <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]"><TranslatedText text="Curated Selection" lang={lang} /></span>
             <h2 className="text-4xl md:text-6xl font-display italic text-ink">{t.featured}</h2>
-            <p className="text-ink/60 italic">Handpicked escapes for the discerning traveler.</p>
+            <p className="text-ink/60 italic"><TranslatedText text="Handpicked escapes for the discerning traveler." lang={lang} /></p>
           </div>
           <button onClick={() => navigate('/discover')} className="btn-outline flex items-center gap-2 group">
-            View All <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            <TranslatedText text="View All" lang={lang} /> <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
           </button>
         </motion.div>
 
@@ -279,7 +286,7 @@ const HomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto space-y-12">
           <div className="text-center space-y-4">
             <h2 className="text-5xl font-display italic">{t.stories}</h2>
-            <p className="text-ink/60 italic max-w-2xl mx-auto">Discover Italy through the eyes of fellow travelers.</p>
+            <p className="text-ink/60 italic max-w-2xl mx-auto"><TranslatedText text="Discover Italy through the eyes of fellow travelers." lang={lang} /></p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             {STORIES.map((story) => (
@@ -300,7 +307,7 @@ const HomePage: React.FC = () => {
                     onClick={() => addNotification("Full story coming soon to ItaliaGo Magazine.", 'info')}
                     className="text-sm font-bold flex items-center gap-2 group-hover:gap-4 transition-all"
                   >
-                    Read More <ArrowRight size={16} />
+                    <TranslatedText text="Read More" lang={lang} /> <ArrowRight size={16} />
                   </button>
                 </div>
               </motion.div>
@@ -329,9 +336,9 @@ const HomePage: React.FC = () => {
           
           <div className="relative z-10 space-y-8 max-w-2xl mx-auto">
             <div className="space-y-4">
-              <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]">Exclusive Access</span>
-              <h2 className="text-5xl md:text-7xl font-display italic">Join the Inner Circle</h2>
-              <p className="text-white/60 text-lg font-light leading-relaxed">Receive curated travel inspiration, exclusive offers, and early access to our most prestigious experiences.</p>
+              <span className="text-gold font-bold uppercase tracking-[0.4em] text-[10px]"><TranslatedText text="Exclusive Access" lang={lang} /></span>
+              <h2 className="text-5xl md:text-7xl font-display italic"><TranslatedText text="Join the Inner Circle" lang={lang} /></h2>
+              <p className="text-white/60 text-lg font-light leading-relaxed"><TranslatedText text="Receive curated travel inspiration, exclusive offers, and early access to our most prestigious experiences." lang={lang} /></p>
             </div>
             
             <div className="flex flex-col md:flex-row gap-4 pt-4">
@@ -347,7 +354,7 @@ const HomePage: React.FC = () => {
                 Subscribe
               </button>
             </div>
-            <p className="text-[10px] text-white/30 uppercase tracking-widest">By subscribing, you agree to our privacy policy.</p>
+            <p className="text-[10px] text-white/30 uppercase tracking-widest"><TranslatedText text="By subscribing, you agree to our privacy policy." lang={lang} /></p>
           </div>
         </motion.div>
       </section>

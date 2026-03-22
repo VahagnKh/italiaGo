@@ -160,9 +160,24 @@ service cloud.firestore {
              isValidDateString(data.created_at);
     }
 
+    function isValidClientError(data) {
+      return hasRequiredFields(['message', 'created_at']) &&
+             data.message is string && data.message.size() > 0 &&
+             isValidDateString(data.created_at) &&
+             (data.get('stack', '') is string) &&
+             (data.get('url', '') is string) &&
+             (data.get('line', 0) is number) &&
+             (data.get('col', 0) is number);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
+
+    match /client_errors/{errorId} {
+      allow read: if isAdmin();
+      allow create: if true; // Allow server (unauthenticated client) to report errors
+    }
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
