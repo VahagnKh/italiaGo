@@ -5,11 +5,11 @@ import { useAuth } from './AuthContext';
 
 interface Notification {
   id: string;
-  userId: string;
+  user_id: string;
   message: string;
   type: 'success' | 'info' | 'error' | 'security';
   read: boolean;
-  createdAt: any;
+  created_at: any;
 }
 
 interface NotificationContextType {
@@ -34,8 +34,8 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     const q = query(
       collection(db, 'notifications'),
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc'),
+      where('user_id', '==', user.uid),
+      orderBy('created_at', 'desc'),
       limit(50)
     );
 
@@ -57,11 +57,11 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!targetUserId) return;
 
     await addDoc(collection(db, 'notifications'), {
-      userId: targetUserId,
+      user_id: targetUserId,
       message,
       type,
       read: false,
-      createdAt: serverTimestamp()
+      created_at: serverTimestamp()
     });
   };
 

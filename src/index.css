@@ -8,6 +8,8 @@
 
   --color-gold: #D4AF37;
   --color-gold-light: #F1E5AC;
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
   --color-paper: var(--bg);
   --color-ink: var(--text);
   --color-card: var(--card-bg);
@@ -16,15 +18,17 @@
 }
 
 :root {
-  --bg: #F5F2ED;
+  --bg: #F8F9FB;
   --text: #1A1A1A;
   --card-bg: #FFFFFF;
   --card-border: rgba(0, 0, 0, 0.05);
   --btn-bg: #1A1A1A;
   --btn-text: #FFFFFF;
-  --nav-bg: rgba(245, 242, 237, 0.8);
+  --nav-bg: rgba(248, 249, 251, 0.8);
   --footer-bg: #1A1A1A;
   --footer-text: #FFFFFF;
+  --accent: #00A3FF;
+  --accent-light: rgba(0, 163, 255, 0.1);
 }
 
 .dark {
@@ -37,6 +41,8 @@
   --nav-bg: rgba(15, 15, 15, 0.8);
   --footer-bg: #F5F2ED;
   --footer-text: #1A1A1A;
+  --accent: #00A3FF;
+  --accent-light: rgba(0, 163, 255, 0.1);
 }
 
 @layer base {
@@ -52,9 +58,43 @@
 }
 
 .luxury-card {
-  background-color: var(--card-bg);
-  border-color: var(--card-border);
-  @apply rounded-[2rem] shadow-sm border overflow-hidden transition-all duration-700 hover:shadow-2xl hover:-translate-y-2;
+  @apply bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden transition-all duration-700 hover:shadow-2xl hover:-translate-y-2;
+}
+
+.dashboard-card {
+  @apply bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm transition-all duration-500 hover:shadow-2xl;
+}
+
+.sidebar-item {
+  @apply flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all duration-300;
+}
+
+.sidebar-item-active {
+  @apply bg-accent text-white shadow-lg shadow-accent/20;
+}
+
+.sidebar-item-inactive {
+  @apply text-gray-400 hover:bg-gray-50 hover:text-gray-900;
+}
+
+.stat-card {
+  @apply bg-white rounded-[2.5rem] p-8 border border-gray-100 flex flex-col gap-3 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-500 cursor-pointer;
+}
+
+.btn-luxury {
+  @apply px-10 py-4 rounded-2xl bg-gray-900 text-white text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-accent hover:scale-105 transition-all duration-500 shadow-xl;
+}
+
+.btn-outline {
+  @apply px-10 py-4 rounded-2xl border border-gray-200 text-gray-900 text-[10px] font-bold uppercase tracking-[0.2em] hover:border-accent hover:text-accent transition-all duration-500;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .glass {

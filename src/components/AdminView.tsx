@@ -54,6 +54,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   LineChart, 
   Line, 
@@ -87,6 +88,7 @@ interface Listing {
 
 export default function AdminView({ onClose }: { onClose: () => void }) {
   const { t } = useLanguage();
+  const { fetchWithAuth, token } = useAuth();
   const [listings, setListings] = useState<Listing[]>([]);
   const [editingListing, setEditingListing] = useState<Partial<Listing> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,12 +105,30 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [userFilter, setUserFilter] = useState('all');
+  const [isAddingUser, setIsAddingUser] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({ name: '', email: '', password: '', role: 'user' });
+  const [systemSettings, setSystemSettings] = useState({
+    siteName: 'ItaliaGo',
+    adminEmail: 'admin@italiago.com',
+    maintenanceMode: false,
+    userRegistration: true,
+    stripePublicKey: 'pk_test_************************',
+    firebaseProjectId: 'italiago-prod'
+  });
+  const [securityStats, setSecurityStats] = useState({
+    failedLogins: 12,
+    activeSessions: 45,
+    blockedIPs: 3,
+    lastSecurityScan: new Date().toISOString()
+  });
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [reconnectKey, setReconnectKey] = useState(0);
 
   useEffect(() => {
-    fetchAllData();
+    if (token) {
+      fetchAllData();
+    }
     
     // Setup WebSocket for real-time updates
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -133,7 +153,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
     };
 
     return () => socket.close();
-  }, [reconnectKey]);
+  }, [reconnectKey, token]);
 
   useEffect(() => {
     if (activeMenu === 'chat') {
@@ -162,10 +182,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchListings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/listings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch('/api/listings');
       if (res.ok) {
         const data = await res.json();
         setListings(Array.isArray(data) ? data : []);
@@ -175,10 +192,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/users', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/admin/users');
       if (res.ok) {
         const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
@@ -188,10 +202,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchAllBookings = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/bookings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/admin/bookings');
       if (res.ok) {
         const data = await res.json();
         setAllBookings(Array.isArray(data) ? data : []);
@@ -201,10 +212,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchActivityLogs = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/logs/activity', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/admin/logs/activity');
       if (res.ok) {
         const data = await res.json();
         setActivityLogs(Array.isArray(data) ? data : []);
@@ -214,10 +222,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchAdminLogs = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/logs/admin', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/admin/logs/admin');
       if (res.ok) {
         const data = await res.json();
         setAdminLogs(Array.isArray(data) ? data : []);
@@ -227,10 +232,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/notifications', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/admin/notifications');
       if (res.ok) {
         const data = await res.json();
         setNotifications(Array.isArray(data) ? data : []);
@@ -240,10 +242,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchAnalytics = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/analytics/activity', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/admin/analytics/activity');
       if (res.ok) {
         const data = await res.json();
         setAnalyticsData(Array.isArray(data) ? data : []);
@@ -253,10 +252,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const fetchMessages = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/messages', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth('/api/admin/messages');
       if (res.ok) {
         const data = await res.json();
         setAdminMessages(Array.isArray(data) ? data : []);
@@ -268,13 +264,8 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     if (!newMessage.trim()) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/messages', {
+      const res = await fetchWithAuth('/api/admin/messages', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ message: newMessage })
       });
       if (res.ok) {
@@ -283,15 +274,15 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
     } catch (e) { console.error(e); }
   };
 
+  const handleSaveSettings = async () => {
+    // In a real app, this would be a POST to /api/admin/settings
+    alert('Settings saved successfully (Simulated)');
+  };
+
   const handleUpdateRole = async (userId: string, role: string) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/users/${userId}/role`, {
+      const res = await fetchWithAuth(`/api/admin/users/${userId}/role`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ role })
       });
       if (res.ok) fetchUsers();
@@ -300,16 +291,29 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
 
   const handleToggleUserStatus = async (userId: string, currentDisabled: boolean) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/users/${userId}/status`, {
+      const res = await fetchWithAuth(`/api/admin/users/${userId}/status`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({ disabled: !currentDisabled })
       });
       if (res.ok) fetchUsers();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetchWithAuth('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(newUserForm)
+      });
+      if (res.ok) {
+        setIsAddingUser(false);
+        setNewUserForm({ name: '', email: '', password: '', role: 'user' });
+        fetchUsers();
+      } else {
+        const error = await res.json();
+        alert(error.error || 'Failed to create user');
+      }
     } catch (e) { console.error(e); }
   };
 
@@ -322,13 +326,8 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
   const handleSaveListing = async () => {
     if (!editingListing) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/admin/listings', {
+      const res = await fetchWithAuth('/api/admin/listings', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify(editingListing)
       });
       if (res.ok) {
@@ -338,13 +337,11 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
     } catch (e) { console.error(e); }
   };
 
-  const handleDeleteListing = async (id: string) => {
+  const handleDeleteListing = async (id: string, type: string) => {
     if (!confirm('Are you sure you want to delete this listing?')) return;
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/listings/${id}`, { 
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await fetchWithAuth(`/api/admin/listings/${id}?type=${type}`, { 
+        method: 'DELETE'
       });
       if (res.ok) fetchListings();
     } catch (e) { console.error(e); }
@@ -532,10 +529,8 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                 <div className="p-3 border-b border-border font-bold text-sm flex justify-between items-center">
                   Notifications
                   <button onClick={() => {
-                    const token = localStorage.getItem('token');
-                    fetch('/api/admin/notifications/read', { 
-                      method: 'POST',
-                      headers: { 'Authorization': `Bearer ${token}` }
+                    fetchWithAuth('/api/admin/notifications/read', { 
+                      method: 'POST'
                     }).then(fetchNotifications);
                   }} className="text-xs text-blue-500 hover:underline">Mark all as read</button>
                 </div>
@@ -738,7 +733,10 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                       <option value="disabled">Disabled</option>
                     </select>
                   </div>
-                  <button className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors">
+                  <button 
+                    onClick={() => setIsAddingUser(true)}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-blue-600 transition-colors"
+                  >
                     <UserPlus size={16} /> Add User
                   </button>
                 </div>
@@ -1052,23 +1050,29 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
           {/* Security Monitoring View */}
           {activeMenu === 'security' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded border border-border shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center"><AlertTriangle size={24} /></div>
-                  <div><p className="text-2xl font-bold">12</p><p className="text-xs text-[#6c757d] font-bold uppercase">Security Alerts</p></div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded border border-border shadow-sm">
+                  <div className="text-[#6c757d] text-xs font-bold uppercase mb-1">Failed Logins (24h)</div>
+                  <div className="text-2xl font-bold text-rose-500">{securityStats.failedLogins}</div>
                 </div>
-                <div className="bg-white p-6 rounded border border-border shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center"><Lock size={24} /></div>
-                  <div><p className="text-2xl font-bold">3</p><p className="text-xs text-[#6c757d] font-bold uppercase">Locked Accounts</p></div>
+                <div className="bg-white p-4 rounded border border-border shadow-sm">
+                  <div className="text-[#6c757d] text-xs font-bold uppercase mb-1">Active Sessions</div>
+                  <div className="text-2xl font-bold text-blue-500">{securityStats.activeSessions}</div>
                 </div>
-                <div className="bg-white p-6 rounded border border-border shadow-sm flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center"><Shield size={24} /></div>
-                  <div><p className="text-2xl font-bold">Active</p><p className="text-xs text-[#6c757d] font-bold uppercase">Firewall Status</p></div>
+                <div className="bg-white p-4 rounded border border-border shadow-sm">
+                  <div className="text-[#6c757d] text-xs font-bold uppercase mb-1">Blocked IPs</div>
+                  <div className="text-2xl font-bold text-amber-500">{securityStats.blockedIPs}</div>
+                </div>
+                <div className="bg-white p-4 rounded border border-border shadow-sm">
+                  <div className="text-[#6c757d] text-xs font-bold uppercase mb-1">Last Scan</div>
+                  <div className="text-sm font-bold">{new Date(securityStats.lastSecurityScan).toLocaleTimeString()}</div>
                 </div>
               </div>
 
               <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
-                <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">Security Incident Logs</div>
+                <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa] flex items-center gap-2">
+                  <Shield size={16} className="text-blue-500" /> Security Incident Logs
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
@@ -1088,8 +1092,182 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                           <td className="px-4 py-3 text-[#6c757d]">{new Date(n.created_at).toLocaleString()}</td>
                         </tr>
                       ))}
+                      {notifications.filter(n => n.type === 'security').length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-4 py-12 text-center text-[#6c757d]">
+                            <Shield size={48} className="mx-auto mb-4 opacity-20" />
+                            <p>No critical security events detected in the last 24 hours.</p>
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Activity Logs View */}
+          {activeMenu === 'activity-logs' && (
+            <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa] flex justify-between items-center">
+                <div className="flex items-center gap-2"><Activity size={16} className="text-blue-500" /> User Activity Logs</div>
+                <button onClick={fetchActivityLogs} className="p-1.5 hover:bg-paper rounded transition-colors text-[#6c757d]"><RefreshCw size={14} /></button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] border-b border-border">
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Method</th>
+                      <th className="px-4 py-3">Path</th>
+                      <th className="px-4 py-3">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {activityLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-paper/50">
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="font-bold">{log.user_name}</span>
+                            <span className="text-[10px] text-[#6c757d]">{log.user_email}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-medium">{log.action || 'Access'}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-0.5 rounded-full font-bold uppercase text-[9px] ${
+                            log.method === 'GET' ? 'bg-blue-100 text-blue-600' :
+                            log.method === 'POST' ? 'bg-emerald-100 text-emerald-600' :
+                            log.method === 'DELETE' ? 'bg-rose-100 text-rose-600' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {log.method}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[#6c757d]">{log.path}</td>
+                        <td className="px-4 py-3 text-[#6c757d]">{new Date(log.created_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Logs View */}
+          {activeMenu === 'admin-logs' && (
+            <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+              <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa] flex justify-between items-center">
+                <div className="flex items-center gap-2"><Terminal size={16} className="text-amber-500" /> Administrative Action Logs</div>
+                <button onClick={fetchAdminLogs} className="p-1.5 hover:bg-paper rounded transition-colors text-[#6c757d]"><RefreshCw size={14} /></button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] border-b border-border">
+                      <th className="px-4 py-3">Admin</th>
+                      <th className="px-4 py-3">Action</th>
+                      <th className="px-4 py-3">Target</th>
+                      <th className="px-4 py-3">Details</th>
+                      <th className="px-4 py-3">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {adminLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-paper/50">
+                        <td className="px-4 py-3 font-bold">{log.admin_name}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-600 rounded-full font-bold uppercase text-[9px]">
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-medium">{log.target}</td>
+                        <td className="px-4 py-3 text-[#6c757d] truncate max-w-[200px]">{JSON.stringify(log.details)}</td>
+                        <td className="px-4 py-3 text-[#6c757d]">{new Date(log.created_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Settings View */}
+          {activeMenu === 'settings' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">System Settings</div>
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-[#6c757d]">Site Name</label>
+                      <input 
+                        type="text" 
+                        value={systemSettings.siteName} 
+                        onChange={(e) => setSystemSettings({...systemSettings, siteName: e.target.value})}
+                        className="w-full bg-[#f8f9fa] border border-border rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-[#6c757d]">Admin Email</label>
+                      <input 
+                        type="email" 
+                        value={systemSettings.adminEmail} 
+                        onChange={(e) => setSystemSettings({...systemSettings, adminEmail: e.target.value})}
+                        className="w-full bg-[#f8f9fa] border border-border rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-[#6c757d]">Maintenance Mode</label>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => setSystemSettings({...systemSettings, maintenanceMode: !systemSettings.maintenanceMode})}
+                          className={`w-12 h-6 rounded-full relative transition-colors ${systemSettings.maintenanceMode ? 'bg-rose-500' : 'bg-slate-200'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${systemSettings.maintenanceMode ? 'right-1' : 'left-1'}`} />
+                        </button>
+                        <span className="text-sm text-[#6c757d]">{systemSettings.maintenanceMode ? 'Enabled' : 'Disabled'}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold uppercase text-[#6c757d]">User Registration</label>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => setSystemSettings({...systemSettings, userRegistration: !systemSettings.userRegistration})}
+                          className={`w-12 h-6 rounded-full relative transition-colors ${systemSettings.userRegistration ? 'bg-blue-500' : 'bg-slate-200'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow-sm transition-all ${systemSettings.userRegistration ? 'right-1' : 'left-1'}`} />
+                        </button>
+                        <span className="text-sm text-[#6c757d]">{systemSettings.userRegistration ? 'Enabled' : 'Disabled'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-4 border-t border-border flex justify-end">
+                    <button 
+                      onClick={handleSaveSettings}
+                      className="bg-blue-500 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-blue-600 transition-colors"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded border border-border overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-border font-bold text-sm bg-[#f8f9fa]">API Configuration</div>
+                <div className="p-6 space-y-4">
+                  <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg flex items-start gap-3">
+                    <AlertTriangle className="text-amber-500 shrink-0" size={20} />
+                    <p className="text-xs text-amber-700">Changing API keys may affect live services. Please proceed with caution.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-[#6c757d]">Stripe Public Key</label>
+                    <input type="password" value={systemSettings.stripePublicKey} readOnly className="w-full bg-[#f8f9fa] border border-border rounded-lg px-4 py-2 text-sm outline-none font-mono" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold uppercase text-[#6c757d]">Firebase Project ID</label>
+                    <input type="text" value={systemSettings.firebaseProjectId} readOnly className="w-full bg-[#f8f9fa] border border-border rounded-lg px-4 py-2 text-sm outline-none font-mono" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1123,7 +1301,7 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                         <img src={listing.image || undefined} alt={listing.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => setEditingListing(listing)} className="p-2 bg-white/90 backdrop-blur-sm text-ink rounded-full hover:bg-gold hover:text-white transition-all shadow-lg"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteListing(listing.id)} className="p-2 bg-white/90 backdrop-blur-sm text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-lg"><Trash2 size={16} /></button>
+                          <button onClick={() => handleDeleteListing(listing.id, listing.type)} className="p-2 bg-white/90 backdrop-blur-sm text-red-500 rounded-full hover:bg-red-500 hover:text-white transition-all shadow-lg"><Trash2 size={16} /></button>
                         </div>
                         <div className="absolute top-4 left-4">
                           <span className="px-3 py-1 bg-ink/80 backdrop-blur-sm text-white text-[10px] font-bold uppercase tracking-widest rounded-full">{listing.type}</span>
@@ -1205,6 +1383,64 @@ export default function AdminView({ onClose }: { onClose: () => void }) {
                 <button onClick={() => setEditingListing(null)} className="flex-1 btn-outline py-4">{t.cancel}</button>
                 <button onClick={handleSaveListing} className="flex-1 btn-luxury py-4 flex items-center justify-center gap-2"><Save size={18} /> {t.save}</button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {isAddingUser && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-ink/60 backdrop-blur-sm z-[110] flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-card w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col">
+              <div className="p-8 border-b border-border flex justify-between items-center">
+                <h2 className="text-2xl font-display italic text-ink">Add New User</h2>
+                <button onClick={() => setIsAddingUser(false)} className="text-ink/40 hover:text-ink"><X size={24} /></button>
+              </div>
+              <form onSubmit={handleCreateUser} className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Full Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newUserForm.name}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
+                    className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Email Address</label>
+                  <input 
+                    type="email" 
+                    required
+                    value={newUserForm.email}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
+                    className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Password</label>
+                  <input 
+                    type="password" 
+                    required
+                    value={newUserForm.password}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                    className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-ink/40 ml-4">Role</label>
+                  <select 
+                    value={newUserForm.role}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                    className="w-full bg-paper/50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-1 focus:ring-gold text-ink"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Administrator</option>
+                  </select>
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button type="button" onClick={() => setIsAddingUser(false)} className="flex-1 btn-outline py-4">Cancel</button>
+                  <button type="submit" className="flex-1 btn-luxury py-4">Create User</button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}

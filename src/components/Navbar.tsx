@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   User, Bell, MessageSquare, Search, Menu, X, 
   Sparkles, ShoppingBag, Globe, LogOut, Shield,
-  ChevronDown
+  ChevronDown, CheckSquare
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -38,6 +38,7 @@ const Navbar: React.FC<NavbarProps> = ({ onAuthClick, onAIClick, onAdminClick, s
   }, []);
 
   const navLinks = [
+    { name: 'Home', path: '/', view: 'home' },
     { name: 'Discover', path: '/discover', view: 'discover' },
     { name: t.hotels, path: '/hotels', view: 'hotels' },
     { name: t.restaurants, path: '/restaurants', view: 'restaurants' },
@@ -226,6 +227,15 @@ const Navbar: React.FC<NavbarProps> = ({ onAuthClick, onAIClick, onAdminClick, s
                             <User size={20} />
                           </div>
                           <span className="text-xs font-bold uppercase tracking-widest">Dashboard</span>
+                        </button>
+                        <button 
+                          onClick={() => { handleNavClick({ view: 'tasks' }); setShowUserMenu(false); }}
+                          className="w-full flex items-center gap-4 p-4 rounded-2xl hover:bg-paper transition-all text-ink group"
+                        >
+                          <div className="w-10 h-10 bg-emerald-500/10 text-emerald-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <CheckSquare size={20} />
+                          </div>
+                          <span className="text-xs font-bold uppercase tracking-widest">Tasks</span>
                         </button>
                         <button 
                           onClick={() => { handleNavClick({ view: 'messages' }); setShowUserMenu(false); }}

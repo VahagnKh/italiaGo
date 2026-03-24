@@ -11,7 +11,7 @@ interface ReviewsSectionProps {
 
 const ReviewsSection: React.FC<ReviewsSectionProps> = ({ itemId, type }) => {
   const { t } = useLanguage();
-  const { user, userData } = useAuth();
+  const { user, userData, fetchWithAuth, token } = useAuth();
   const { addReview } = useListings();
   const [reviews, setReviews] = useState<any[]>([]);
   const [rating, setRating] = useState(5);
@@ -19,14 +19,11 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ itemId, type }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    fetch(`/api/reviews/${itemId}?type=${type}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    fetchWithAuth(`/api/reviews/${itemId}?type=${type}`)
       .then(res => res.json())
       .then(data => setReviews(Array.isArray(data) ? data : []))
       .catch(console.error);
-  }, [itemId, type]);
+  }, [itemId, type, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

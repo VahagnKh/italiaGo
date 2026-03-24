@@ -120,12 +120,31 @@
         "created_at": { "type": "string", "format": "date-time" }
       },
       "required": ["message", "created_at"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "User task for management",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "due_date": { "type": "string", "format": "date-time" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "status": { "type": "string", "enum": ["todo", "in-progress", "completed"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "title", "priority", "status", "created_at"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User tasks"
     },
     "/hotels/{id}": {
       "schema": "Listing",

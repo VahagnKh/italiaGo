@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Hotel, Utensils, Car, Compass, Trash2, MapPin, Star, Sparkles, 
   Camera, Upload, User, Mail, Heart, Wallet, Gift, LayoutDashboard,
-  MessageSquare, Settings, Gamepad2, ShoppingBag
+  MessageSquare, Settings, Gamepad2, ShoppingBag, X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -115,10 +115,28 @@ const DashboardPage: React.FC = () => {
 export const DashboardOverview: React.FC = () => {
   const { user, userData } = useAuth();
   const { t } = useLanguage();
-  const { bookings, loading: bookingsLoading } = useBookings();
+  const { bookings, loading: bookingsLoading, cancelBooking } = useBookings();
   const { favorites } = useFavorites();
+  const { addNotification } = useNotifications();
+
+  const [cancellingBooking, setCancellingBooking] = useState<any | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const displayName = userData?.name || user?.displayName || 'Guest';
+
+  const handleCancelBooking = async (bookingId: string) => {
+    setIsCancelling(true);
+    try {
+      await cancelBooking(bookingId);
+      addNotification('Booking cancelled successfully', 'success');
+    } catch (err) {
+      console.error('Cancellation failed:', err);
+      addNotification('Failed to cancel booking', 'error');
+    } finally {
+      setIsCancelling(false);
+      setCancellingBooking(null);
+    }
+  };
 
   return (
     <div className="space-y-12">
@@ -157,12 +175,13 @@ export const DashboardOverview: React.FC = () => {
                   <th className="px-6 py-4">Date</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4">Amount</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {bookingsLoading ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center">
+                    <td colSpan={5} className="px-6 py-12 text-center">
                       <motion.div 
                         animate={{ rotate: 360 }}
                         transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
@@ -181,17 +200,19 @@ export const DashboardOverview: React.FC = () => {
                           {booking.type === 'tour' && <Compass size={14} />}
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-ink">{booking.itemName}</p>
+                          <p className="font-bold text-sm text-ink">{booking.item_name}</p>
                           <p className="text-[10px] text-ink/40 uppercase tracking-widest">{booking.type}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-ink/60">
-                      {booking.createdAt?.toDate ? booking.createdAt.toDate().toLocaleDateString() : 'Pending'}
+                      {booking.created_at?.toDate ? booking.created_at.toDate().toLocaleDateString() : (booking.created_at ? new Date(booking.created_at).toLocaleDateString() : 'Pending')}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                        booking.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' : 'bg-paper text-ink/40'
+                        booking.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' : 
+                        booking.status === 'cancelled' ? 'bg-red-50 text-red-600' :
+                        'bg-paper text-ink/40'
                       }`}>
                         {booking.status}
                       </span>
@@ -199,11 +220,22 @@ export const DashboardOverview: React.FC = () => {
                     <td className="px-6 py-4 font-bold text-sm text-ink">
                       €{booking.amount?.toFixed(2) || '0.00'}
                     </td>
+                    <td className="px-6 py-4 text-right">
+                      {booking.type === 'taxi' && booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                        <button 
+                          onClick={() => setCancellingBooking(booking)}
+                          className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors"
+                          title="Cancel Ride"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {!bookingsLoading && bookings.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-ink/40 italic">
+                    <td colSpan={5} className="px-6 py-12 text-center text-ink/40 italic">
                       No bookings found. Start exploring!
                     </td>
                   </tr>
@@ -213,6 +245,61 @@ export const DashboardOverview: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {cancellingBooking && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isCancelling && setCancellingBooking(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-card rounded-[2.5rem] overflow-hidden shadow-2xl p-8 space-y-6 border border-border"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-500 mx-auto">
+                  <X size={32} />
+                </div>
+                <h3 className="text-2xl font-display italic text-ink">Cancel Taxi Ride?</h3>
+                <p className="text-sm text-ink/60">
+                  Are you sure you want to cancel your ride for <span className="font-bold text-ink">{cancellingBooking.item_name}</span>? This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  disabled={isCancelling}
+                  onClick={() => setCancellingBooking(null)}
+                  className="flex-1 px-6 py-4 rounded-full border border-border text-xs font-bold uppercase tracking-widest hover:bg-paper transition-colors disabled:opacity-50"
+                >
+                  No, Keep it
+                </button>
+                <button 
+                  disabled={isCancelling}
+                  onClick={() => handleCancelBooking(cancellingBooking.id)}
+                  className="flex-1 px-6 py-4 rounded-full bg-red-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-red-600 transition-colors shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isCancelling ? (
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                      className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                  ) : (
+                    'Yes, Cancel'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

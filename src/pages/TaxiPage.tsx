@@ -132,11 +132,13 @@ const TaxiPage: React.FC = () => {
     try {
       await createBooking({
         type: 'taxi',
-        itemId: 'taxi-booking',
-        itemName: `Ride to ${destination}`,
+        listing_id: 'taxi-booking',
+        listing_type: 'taxi',
+        item_name: `Ride to ${destination}`,
         details: `From ${pickup} to ${destination}. Options: ${rideOptions.join(', ')}`,
         amount: estimate.cost,
-        status: 'confirmed'
+        status: 'confirmed',
+        date: new Date().toISOString().split('T')[0],
       });
       
       setRideStatus('searching');

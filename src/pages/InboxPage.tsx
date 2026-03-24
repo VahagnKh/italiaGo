@@ -3,37 +3,31 @@ import { Mail, MoreVertical, Send } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const InboxPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, fetchWithAuth, token } = useAuth();
   const [messages, setMessages] = useState<any[]>([]);
   const [content, setContent] = useState('');
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
+  const fetchMessages = () => {
     if (!token) return;
-    fetch('/api/messages', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
+    fetchWithAuth('/api/messages')
       .then(res => res.json())
       .then(data => setMessages(Array.isArray(data) ? data : []));
-  }, []);
+  };
+
+  useEffect(() => {
+    fetchMessages();
+  }, [token]);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim()) return;
-    const token = localStorage.getItem('token');
-    fetch('/api/messages', {
+    fetchWithAuth('/api/messages', {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
       body: JSON.stringify({ receiverId: 1, content }) // Simplified: send to admin/mentor 1
     })
     .then(() => {
       setContent('');
-      fetch('/api/messages', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      }).then(res => res.json()).then(data => setMessages(Array.isArray(data) ? data : []));
+      fetchMessages();
     });
   };
 

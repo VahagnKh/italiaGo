@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { User, Mail, Lock, X, ArrowRight } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
@@ -33,11 +33,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess }) => {
       const user = result.user;
 
       // Create Firestore user document if it doesn't exist
+      const isAdmin = user.email === 'ekyuregh@gmail.com';
       await setDoc(doc(db, 'users', user.uid), {
         id: user.uid,
         email: user.email,
         name: user.displayName || 'User',
-        role: 'user',
+        role: isAdmin ? 'admin' : 'user',
         wallet_balance: 0,
         bonus: 0,
         status: 'Normal',
@@ -71,11 +72,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose, onSuccess }) => {
         await updateProfile(user, { displayName: name });
         
         // Create Firestore user document
+        const isAdmin = user.email === 'ekyuregh@gmail.com';
         await setDoc(doc(db, 'users', user.uid), {
           id: user.uid,
           email: user.email,
           name: name,
-          role: 'user',
+          role: isAdmin ? 'admin' : 'user',
           wallet_balance: 0,
           bonus: 0,
           status: 'Normal',

@@ -5,9 +5,9 @@ import { useAuth } from './AuthContext';
 
 interface Favorite {
   id: string;
-  userId: string;
-  itemId: string;
-  itemType: string;
+  user_id: string;
+  listing_id: string;
+  listing_type: string;
   name?: string;
   image_url?: string;
   location?: string;
@@ -37,7 +37,7 @@ export const FavoriteProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const q = query(
       collection(db, 'favorites'),
-      where('userId', '==', user.uid)
+      where('user_id', '==', user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -58,25 +58,25 @@ export const FavoriteProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const toggleFavorite = async (item: any) => {
     if (!user) return;
 
-    const itemId = item.id || item.itemId;
-    const existing = favorites.find(f => f.itemId === itemId);
+    const itemId = item.id || item.listing_id;
+    const existing = favorites.find(f => f.listing_id === itemId);
     if (existing) {
       await deleteDoc(doc(db, 'favorites', existing.id));
     } else {
       await addDoc(collection(db, 'favorites'), {
-        userId: user.uid,
-        itemId,
-        itemType: item.type || item.itemType || 'unknown',
+        user_id: user.uid,
+        listing_id: itemId,
+        listing_type: item.type || item.listing_type || 'unknown',
         name: item.name || '',
         image_url: item.image_url || item.image || '',
         location: item.location || '',
-        type: item.type || item.itemType || ''
+        type: item.type || item.listing_type || ''
       });
     }
   };
 
   const isFavorite = (itemId: string) => {
-    return favorites.some(f => f.itemId === itemId);
+    return favorites.some(f => f.listing_id === itemId);
   };
 
   return (

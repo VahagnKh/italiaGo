@@ -63,10 +63,15 @@ import {
   Cell
 } from 'recharts';
 
+import { onAuthStateChanged, onIdTokenChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from './lib/firebase';
 import { useLanguage } from './contexts/LanguageContext';
+import AuthModal from './components/AuthModal';
 import AdminView from './components/AdminView';
 import AIConcierge from './components/AIConcierge';
 import TranslatedText from './components/TranslatedText';
+import TasksPage from './pages/TasksPage';
 
 const LANGUAGES = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -175,11 +180,53 @@ export default function App() {
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   useEffect(() => {
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
+          localStorage.setItem('token', token);
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setUser({
+              ...data,
+              role: (firebaseUser.email === 'ekyuregh@gmail.com' && firebaseUser.emailVerified) ? 'admin' : (data.role || 'user')
+            });
+          } else {
+            // Fallback for users without a document
+            setUser({
+              id: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'User',
+              role: (firebaseUser.email === 'ekyuregh@gmail.com' && firebaseUser.emailVerified) ? 'admin' : 'user'
+            });
+          }
+        } catch (err) {
+          console.error("Error fetching user data:", err);
+          setUser({
+            id: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName || 'User',
+            role: 'user'
+          });
+        }
+      } else {
+        setUser(null);
+        localStorage.removeItem('token');
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       // Filter out benign Vite/WebSocket errors
-      if (event.message?.includes('WebSocket closed without opened') || 
-          event.filename?.includes('/@vite/client') ||
-          event.message?.includes('[vite]')) {
+      const msg = event.message || "";
+      const file = event.filename || "";
+      if (msg.includes('WebSocket closed without opened') || 
+          msg.includes('[vite]') ||
+          msg.includes('failed to connect to websocket') ||
+          file.includes('/@vite/client')) {
         return;
       }
 
@@ -203,7 +250,8 @@ export default function App() {
       const reason = String(event.reason);
       // Filter out benign Vite/WebSocket errors
       if (reason.includes('WebSocket closed without opened') || 
-          reason.includes('[vite]')) {
+          reason.includes('[vite]') ||
+          reason.includes('failed to connect to websocket')) {
         return;
       }
 
@@ -377,7 +425,8 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (user && view === 'home') {
+    // If user just logged in and is on a non-home view, ensure they have a valid view
+    if (user && !['overview', 'inbox', 'tasks', 'notifications', 'favorites', 'profile', 'settings', 'home'].includes(view)) {
       setView('overview');
     }
   }, [user]);
@@ -392,6 +441,7 @@ export default function App() {
             <main className="flex-1 overflow-y-auto px-8">
               {view === 'overview' && <DashboardHome user={user} setView={setView} />}
               {view === 'inbox' && <InboxView user={user} />}
+              {view === 'tasks' && <TasksPage />}
               {view === 'notifications' && (
                 <div className="max-w-4xl mx-auto py-10 space-y-6">
                   <h2 className="text-2xl font-bold text-gray-900">Notifications</h2>
@@ -467,7 +517,16 @@ export default function App() {
           <button onClick={() => { setView('tours'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'tours' ? 'text-ink' : ''}`}>{t.tours}</button>
           <button onClick={() => { setView('rentals'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'rentals' ? 'text-ink' : ''}`}>{t.rentals}</button>
           <button onClick={() => { setView('events'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'events' ? 'text-ink' : ''}`}>{t.events}</button>
-          {(user?.role === 'admin' || user?.name === 'Marco Rossi') && (
+          {user && (
+            <button 
+              onClick={() => setView('overview')} 
+              className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent/80 transition-colors shadow-lg shadow-accent/20"
+            >
+              <LayoutDashboard size={14} />
+              Dashboard
+            </button>
+          )}
+          {(user?.role === 'admin' || user?.name === 'Marco Rossi') && !user && (
             <button 
               onClick={() => setShowAdmin(true)} 
               className="flex items-center gap-2 px-4 py-2 bg-ink text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gold transition-colors"
@@ -701,6 +760,15 @@ export default function App() {
                           <p className="text-sm font-bold text-ink truncate">{user.email}</p>
                         </div>
                         <div className="p-2">
+                          {user && (
+                            <button 
+                              onClick={() => { setView('overview'); setShowProfileMenu(false); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-ink hover:bg-paper transition-colors"
+                            >
+                              <LayoutDashboard size={16} className="text-accent" />
+                              Dashboard
+                            </button>
+                          )}
                           {user.role === 'admin' && (
                             <button 
                               onClick={() => { setShowAdmin(true); setShowProfileMenu(false); }}
@@ -712,7 +780,7 @@ export default function App() {
                           )}
                           <div className="h-px bg-border my-2" />
                           <button 
-                            onClick={() => { setUser(null); setShowProfileMenu(false); }}
+                            onClick={() => { auth.signOut(); setShowProfileMenu(false); }}
                             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-red-500 hover:bg-red-50 transition-colors"
                           >
                             <LogOut size={16} />
@@ -897,9 +965,7 @@ export default function App() {
         {showAuthModal && (
           <AuthModal 
             onClose={() => setShowAuthModal(false)} 
-            onSuccess={(data) => {
-              localStorage.setItem('token', data.token);
-              setUser(data.user);
+            onSuccess={() => {
               setShowAuthModal(false);
             }}
           />
@@ -911,7 +977,7 @@ export default function App() {
 
 function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotification }: { setView: any, t: any, lang: string, setInfoModal: any, setInitialFilter: (f: string) => void, addNotification: (m: string, type?: any) => void }) {
   return (
-    <div className="space-y-20 pb-20">
+    <div className="space-y-32 pb-32">
       {/* Hero */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
         {/* Cinematic Background with Ken Burns */}
@@ -969,23 +1035,23 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotific
             className="pt-10 flex flex-col sm:flex-row items-center justify-center gap-8"
           >
             <motion.button 
-              whileHover={{ scale: 1.05, boxShadow: "0 20px 40px rgba(212, 175, 55, 0.3)" }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
                 const el = document.getElementById('services');
                 if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }} 
-              className="btn-luxury group flex items-center gap-4 px-12 py-5 text-base"
+              className="btn-luxury group flex items-center gap-4 px-12 py-5 text-base hover:shadow-2xl hover:shadow-gold/30"
             >
               {t.start}
               <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
             </motion.button>
             
             <motion.button 
-              whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.2)", borderColor: "rgba(255,255,255,0.8)" }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setView('discover')}
-              className="px-10 py-5 rounded-full border-2 border-white/40 bg-white/5 backdrop-blur-md transition-all text-xs font-bold uppercase tracking-widest shadow-xl"
+              className="px-10 py-5 rounded-full border-2 border-white/40 bg-white/5 backdrop-blur-md transition-all text-xs font-bold uppercase tracking-widest shadow-xl hover:bg-white/20 hover:border-white/80"
             >
               <TranslatedText text="Explore Destinations" lang={lang} />
             </motion.button>
@@ -1043,6 +1109,92 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotific
                 <item.icon size={36} />
               </div>
               <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-ink group-hover:text-gold transition-colors">{item.label}</h3>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Signature Experiences - Bento Grid */}
+      <section className="max-w-7xl mx-auto px-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="text-center space-y-4 mb-20"
+        >
+          <span className="text-gold font-bold uppercase tracking-[0.5em] text-[10px]">Exclusive Access</span>
+          <h2 className="text-4xl md:text-6xl font-display italic text-ink">Signature Experiences</h2>
+        </motion.div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-8 h-[800px]">
+          <motion.div 
+            whileHover={{ scale: 0.98 }}
+            className="md:col-span-2 md:row-span-2 relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
+          >
+            <img src="https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&q=80&w=1200" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="absolute bottom-0 p-12 text-white space-y-4">
+              <span className="text-gold font-bold uppercase tracking-widest text-xs">Venetian Dreams</span>
+              <h3 className="text-4xl font-display italic">Private Gondola Serenade</h3>
+              <p className="text-sm opacity-0 group-hover:opacity-80 transition-opacity duration-500 font-light max-w-md">Experience the magic of Venice's hidden canals with a private musician and champagne service.</p>
+            </div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 0.98 }}
+            className="md:col-span-2 relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
+          >
+            <img src="https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&q=80&w=1200" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="absolute bottom-0 p-10 text-white space-y-2">
+              <span className="text-gold font-bold uppercase tracking-widest text-[10px]">Tuscan Heritage</span>
+              <h3 className="text-2xl font-display italic">Vintage Alfa Romeo Tour</h3>
+            </div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 0.98 }}
+            className="relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
+          >
+            <img src="https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&q=80&w=800" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="absolute bottom-0 p-8 text-white">
+              <h3 className="text-xl font-display italic">Amalfi Sunset Yacht</h3>
+            </div>
+          </motion.div>
+
+          <motion.div 
+            whileHover={{ scale: 0.98 }}
+            className="relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
+          >
+            <img src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=800" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="absolute bottom-0 p-8 text-white">
+              <h3 className="text-xl font-display italic">Dolomites Helicopter Safari</h3>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Stats Section */}
+      <section className="bg-ink py-32">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-16 text-center">
+          {[
+            { label: 'Destinations', value: '150+' },
+            { label: 'Luxury Hotels', value: '450+' },
+            { label: 'Happy Travelers', value: '25k+' },
+            { label: 'Expert Guides', value: '120+' },
+          ].map((stat, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              className="space-y-4"
+            >
+              <h3 className="text-5xl md:text-7xl font-display italic text-gold">{stat.value}</h3>
+              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">{stat.label}</p>
             </motion.div>
           ))}
         </div>
@@ -1182,31 +1334,21 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotific
               referrerPolicy="no-referrer" 
             />
           </motion.div>
-          <div className="absolute inset-0 bg-gradient-to-b from-ink/90 via-ink/40 to-ink/90" />
           
-          <div className="relative z-10 space-y-10 max-w-3xl mx-auto">
-             <div className="space-y-6">
-              <span className="text-gold font-bold uppercase tracking-[0.6em] text-[10px]">Exclusive Access</span>
-              <h2 className="text-5xl md:text-8xl font-display italic leading-tight">Join the Inner Circle</h2>
-              <p className="text-white/60 text-xl font-light leading-relaxed">Receive curated travel inspiration, exclusive offers, and early access to our most prestigious experiences.</p>
-            </div>
+          <div className="relative z-10 space-y-8">
+            <span className="text-gold font-bold uppercase tracking-[0.5em] text-xs">Stay Inspired</span>
+            <h2 className="text-5xl md:text-7xl font-display italic">Join the Inner Circle</h2>
+            <p className="text-white/60 max-w-xl mx-auto text-lg font-light">Get exclusive travel guides, early access to boutique openings, and curated Italian experiences delivered to your inbox.</p>
             
-            <div className="flex flex-col md:flex-row gap-6 pt-6">
+            <form className="max-w-md mx-auto flex flex-col sm:flex-row gap-4 pt-6" onSubmit={(e) => { e.preventDefault(); addNotification("Welcome to the Inner Circle!", 'success'); }}>
               <input 
                 type="email" 
                 placeholder="Your email address" 
-                className="flex-1 bg-white/5 border border-white/10 rounded-full px-10 py-6 outline-none focus:ring-2 focus:ring-gold transition-all backdrop-blur-md text-lg" 
+                className="flex-1 bg-white/10 border border-white/20 rounded-full px-8 py-4 text-white placeholder:text-white/30 focus:outline-none focus:border-gold transition-all backdrop-blur-md"
+                required
               />
-              <motion.button 
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => addNotification('Welcome to the Inner Circle!', 'success')}
-                className="btn-luxury px-16 py-6 text-base"
-              >
-                Subscribe
-              </motion.button>
-            </div>
-            <p className="text-[11px] text-white/30 uppercase tracking-[0.3em]">By subscribing, you agree to our privacy policy.</p>
+              <button type="submit" className="btn-luxury px-10 py-4">Subscribe</button>
+            </form>
           </div>
         </motion.div>
       </section>
@@ -1444,6 +1586,8 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
   const [offers, setOffers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'bookings' | 'favorites' | 'market' | 'game' | 'profile'>('bookings');
   const [isRedeeming, setIsRedeeming] = useState<string | null>(null);
+  const [cancellingBooking, setCancellingBooking] = useState<any | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Profile state
   const [profileName, setProfileName] = useState(user?.name || '');
@@ -1539,6 +1683,33 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
     }
   };
 
+  const handleCancelBooking = async (booking: any) => {
+    setIsCancelling(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/bookings/${booking.id}/cancel`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, status: 'cancelled' } : b));
+        addNotification('Booking cancelled successfully', 'success');
+      } else {
+        const data = await res.json();
+        addNotification(data.error || 'Cancellation failed', 'error');
+      }
+    } catch (err) {
+      console.error('Cancellation failed:', err);
+      addNotification('Connection error during cancellation', 'error');
+    } finally {
+      setIsCancelling(false);
+      setCancellingBooking(null);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -1631,6 +1802,7 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
                         <th className="px-6 py-4">Date</th>
                         <th className="px-6 py-4">Status</th>
                         <th className="px-6 py-4">Amount</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
@@ -1654,18 +1826,33 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
                             {new Date(booking.created_at).toLocaleDateString()}
                           </td>
                           <td className="px-6 py-4">
-                            <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                              booking.status === 'confirmed' ? 'bg-emerald-50 text-emerald-600' : 
+                              booking.status === 'cancelled' ? 'bg-red-50 text-red-600' :
+                              'bg-paper text-ink/40'
+                            }`}>
                               {booking.status}
                             </span>
                           </td>
                           <td className="px-6 py-4 font-bold text-sm text-ink">
                             €{booking.amount.toFixed(2)}
                           </td>
+                          <td className="px-6 py-4 text-right">
+                            {booking.type === 'taxi' && booking.status !== 'cancelled' && booking.status !== 'completed' && (
+                              <button 
+                                onClick={() => setCancellingBooking(booking)}
+                                className="p-2 hover:bg-red-50 text-red-500 rounded-full transition-colors"
+                                title="Cancel Ride"
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                       {bookings.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-6 py-12 text-center text-ink/40 italic">
+                          <td colSpan={5} className="px-6 py-12 text-center text-ink/40 italic">
                             No bookings found. Start exploring!
                           </td>
                         </tr>
@@ -1922,6 +2109,61 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {cancellingBooking && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isCancelling && setCancellingBooking(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-md bg-card rounded-[2.5rem] overflow-hidden shadow-2xl p-8 space-y-6 border border-border"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-500 mx-auto">
+                  <X size={32} />
+                </div>
+                <h3 className="text-2xl font-display italic text-ink">Cancel Taxi Ride?</h3>
+                <p className="text-sm text-ink/60">
+                  Are you sure you want to cancel your ride for <span className="font-bold text-ink">{cancellingBooking.item_name}</span>? This action cannot be undone.
+                </p>
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  disabled={isCancelling}
+                  onClick={() => setCancellingBooking(null)}
+                  className="flex-1 px-6 py-4 rounded-full border border-border text-xs font-bold uppercase tracking-widest hover:bg-paper transition-colors disabled:opacity-50"
+                >
+                  No, Keep it
+                </button>
+                <button 
+                  disabled={isCancelling}
+                  onClick={() => handleCancelBooking(cancellingBooking)}
+                  className="flex-1 px-6 py-4 rounded-full bg-red-500 text-white text-xs font-bold uppercase tracking-widest hover:bg-red-600 transition-colors shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isCancelling ? (
+                    <motion.div 
+                      animate={{ rotate: 360 }}
+                      transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                      className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                  ) : (
+                    'Yes, Cancel'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1930,6 +2172,7 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
 function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string, setView: (v: any) => void, user: any, setUser: (u: any) => void, setShowAdmin: (s: boolean) => void }) {
   const { t } = useLanguage();
   const menuItems = [
+    { id: 'home', label: 'Main Page', icon: Globe },
     { id: 'overview', label: t.destinations, icon: MapIcon },
     { id: 'inbox', label: t.messages, icon: Mail },
     { id: 'notifications', label: t.notifications, icon: Bell },
@@ -1939,54 +2182,59 @@ function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string,
   ];
 
   return (
-    <div className="hidden lg:flex flex-col w-64 bg-white h-full p-6">
-      <div className="flex items-center gap-3 mb-12 px-4">
-        <div className="w-10 h-10 bg-[#7C3AED] rounded-xl flex items-center justify-center text-white">
-          <Plane size={24} />
+    <div className="hidden lg:flex flex-col w-72 bg-white h-full border-r border-gray-100 p-8">
+      <div className="flex items-center gap-3 mb-12 px-2 cursor-pointer" onClick={() => setView('home')}>
+        <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white font-display font-bold">
+          I
         </div>
-        <span className="text-xl font-bold tracking-tight text-gray-900">Tourvisto</span>
+        <span className="text-2xl font-display font-bold tracking-tight text-gray-900">Tourvisto</span>
       </div>
 
-      <div className="space-y-2 flex-1">
+      <div className="space-y-1.5 flex-1">
         {menuItems.map(item => (
           <button
             key={item.id}
             onClick={() => setView(item.id)}
-            className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-medium transition-all ${
-              view === item.id ? 'bg-[#7C3AED] text-white shadow-lg shadow-[#7C3AED]/30' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
+            className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-widest transition-all ${
+              view === item.id ? 'bg-black text-white shadow-xl shadow-black/10' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-900'
             }`}
           >
-            <item.icon size={20} />
+            <item.icon size={18} className={view === item.id ? 'text-gold' : ''} />
             {item.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-auto pt-8 space-y-4">
-        <div className="bg-[#7C3AED]/5 rounded-3xl p-6 relative overflow-hidden group cursor-pointer">
-          <div className="relative z-10 space-y-2">
-            <p className="text-sm font-bold text-gray-900">{t.upgradePro}</p>
-            <p className="text-[10px] text-gray-500 leading-relaxed">{t.upgradeDesc}</p>
-            <button className="mt-2 text-[10px] font-bold text-[#7C3AED] uppercase tracking-widest">{t.learnMore}</button>
+      <div className="mt-auto pt-8 space-y-6">
+        <div className="bg-black text-white rounded-[2rem] p-6 relative overflow-hidden group cursor-pointer">
+          <div className="relative z-10 space-y-3">
+            <div className="w-8 h-8 bg-gold/20 rounded-lg flex items-center justify-center text-gold">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <p className="text-sm font-display italic">{t.upgradePro}</p>
+              <p className="text-[10px] text-gray-400 leading-relaxed mt-1">{t.upgradeDesc}</p>
+            </div>
+            <button className="text-[10px] font-bold text-gold uppercase tracking-widest hover:underline">{t.learnMore}</button>
           </div>
-          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#7C3AED]/10 rounded-full group-hover:scale-150 transition-transform duration-500" />
+          <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-gold/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
         </div>
 
         <div className="space-y-1">
           {user.role === 'admin' && (
             <button
               onClick={() => setShowAdmin(true)}
-              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium text-gold hover:bg-gold/5 transition-all"
+              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-widest text-gold hover:bg-gold/5 transition-all"
             >
-              <Shield size={20} />
+              <Shield size={18} />
               {t.admin}
             </button>
           )}
           <button
-            onClick={() => { setUser(null); setView('home'); }}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-50 transition-all"
+            onClick={() => { auth.signOut(); setView('home'); }}
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all"
           >
-            <LogOut size={20} />
+            <LogOut size={18} />
             {t.logout}
           </button>
         </div>
@@ -2000,34 +2248,41 @@ function TopBar({ setView, user }: { setView: (v: any) => void, user: any }) {
   const [query, setQuery] = useState('');
 
   return (
-    <header className="bg-white px-8 py-6 flex items-center justify-between sticky top-0 z-30">
+    <header className="bg-white/80 backdrop-blur-md px-8 py-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-50">
       <div className="flex-1 max-w-xl">
-        <h1 className="text-2xl font-bold text-gray-900">{t.welcomeBack}, {user.name.split(' ')[0]} 👋</h1>
-        <p className="text-xs text-gray-400 mt-1">{t.manageBookings}</p>
+        <h1 className="text-2xl font-display italic text-gray-900">{t.welcomeBack}, {user.name.split(' ')[0]} 👋</h1>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-1">{t.manageBookings}</p>
       </div>
 
-      <div className="relative flex-1 max-w-md mx-8">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-        <input
-          type="text"
-          placeholder="Search destination, hotel..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="w-full bg-gray-50 border-none rounded-2xl pl-12 pr-4 py-3.5 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
-        />
-      </div>
-
-      <div className="flex items-center gap-4">
-        <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-2xl transition-colors relative">
-          <Bell size={20} />
-          <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-        </button>
-        <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-2xl transition-colors">
-          <Mail size={20} />
-        </button>
-        <div className="h-10 w-px bg-gray-100 mx-2" />
-        <button onClick={() => setView('settings')} className="w-12 h-12 rounded-2xl overflow-hidden bg-gray-100 border-2 border-white shadow-sm">
-          <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
+      <div className="flex items-center gap-6">
+        <div className="relative hidden md:block">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <input 
+            type="text" 
+            placeholder="Search your trips..." 
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="bg-gray-50 border-none rounded-2xl pl-12 pr-6 py-3 text-sm w-64 outline-none focus:ring-2 focus:ring-black/5 transition-all"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-black transition-colors relative">
+            <Bell size={20} />
+            <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+          </button>
+          <button className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-black transition-colors">
+            <Mail size={20} />
+          </button>
+        </div>
+        <div className="h-10 w-px bg-gray-100" />
+        <button onClick={() => setView('profile')} className="flex items-center gap-3 group">
+          <div className="text-right hidden sm:block">
+            <p className="text-xs font-bold text-gray-900 group-hover:text-gold transition-colors">{user.name}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{user.role}</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-white shadow-sm ring-1 ring-gray-100">
+            <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
+          </div>
         </button>
       </div>
     </header>
@@ -2906,46 +3161,61 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
           filteredItems.map((item) => (
             <motion.div 
               key={`${item.type}-${item.id}`}
-              whileHover={{ y: -10 }}
+              whileHover={{ y: -15 }}
               className="luxury-card group cursor-pointer"
             >
-              <div className="h-64 overflow-hidden relative">
-                <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                <div className="absolute top-4 right-4">
-                  <div className="bg-card/90 backdrop-blur px-3 py-1 rounded-full flex items-center gap-1">
+              <div className="h-72 overflow-hidden relative">
+                <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
+                <div className="absolute top-6 right-6 flex flex-col gap-3">
+                  <div className="bg-white/90 backdrop-blur px-4 py-1.5 rounded-full flex items-center gap-1 shadow-lg">
                     {Array.from({ length: item.stars }).map((_, j) => (
                       <Star key={j} size={10} fill="currentColor" className="text-gold" />
                     ))}
                   </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
+                    className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg backdrop-blur-md ${
+                      favorites.some(f => f.id === item.id && f.type === item.type) 
+                        ? 'bg-red-500 text-white' 
+                        : 'bg-white/80 text-ink/40 hover:text-red-500'
+                    }`}
+                  >
+                    <Heart size={16} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
+                  </button>
                 </div>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
-                  className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10 ${
-                    favorites.some(f => f.id === item.id && f.type === item.type) 
-                      ? 'bg-red-500 text-white' 
-                      : 'bg-card/90 backdrop-blur text-ink/40 hover:text-red-500'
-                  }`}
-                >
-                  <Heart size={14} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
-                </button>
+                <div className="absolute bottom-6 left-6 bg-ink/80 backdrop-blur-md px-4 py-2 rounded-2xl text-white text-[10px] font-bold uppercase tracking-widest shadow-2xl">
+                  {item.category || item.type}
+                </div>
               </div>
-              <div className="p-6 space-y-4 bg-card">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-xl font-display text-ink">{item.name}</h3>
-                    <p className="text-sm text-ink/60 flex items-center gap-1">
-                      <MapPin size={12} /> {item.location}
-                    </p>
+              <div className="p-8 space-y-6 bg-white">
+                <div className="flex justify-between items-start gap-4">
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-bold text-ink leading-tight group-hover:text-accent transition-colors">{item.name}</h3>
+                    <div className="flex items-center gap-2 text-ink/40 text-xs">
+                      <MapPin size={12} />
+                      <span>{item.location}</span>
+                    </div>
                   </div>
-                  {item.price && <span className="font-bold text-ink">€{item.price}</span>}
+                  <div className="text-right">
+                    <p className="text-2xl font-bold text-ink">${item.price_per_night || item.price}</p>
+                    <p className="text-[9px] font-bold text-ink/30 uppercase tracking-widest">{item.type === 'hotel' ? t.perNight : t.perPerson}</p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <button onClick={() => setSelectedItem(item)} className="flex-1 btn-outline text-xs py-2">{t.more}</button>
+                <p className="text-xs text-ink/50 leading-relaxed line-clamp-2 italic">
+                  {item.description || "Experience the finest Italian hospitality in a setting of unparalleled beauty and historic charm."}
+                </p>
+                <div className="flex gap-3 pt-2">
                   <button 
                     onClick={(e) => { e.stopPropagation(); onAddToBasket(item); }}
-                    className="flex-1 btn-luxury text-xs py-2"
+                    className="flex-1 btn-luxury py-4"
                   >
-                    {t.addToBasket}
+                    {t.bookNow}
+                  </button>
+                  <button 
+                    onClick={() => setSelectedItem(item)}
+                    className="w-14 h-14 rounded-2xl border border-gray-100 flex items-center justify-center text-ink/40 hover:border-accent hover:text-accent transition-all"
+                  >
+                    <ChevronRight size={20} />
                   </button>
                 </div>
               </div>
@@ -3656,145 +3926,5 @@ function TaxiView({ t, lang, user, refreshUser }: { t: any, lang: string, user: 
   );
 }
 
-function AuthModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: (user: any) => void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-
-    const endpoint = mode === 'login' ? '/api/login' : '/api/register';
-    const body = mode === 'login' ? { email, password } : { email, password, name };
-
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        onSuccess(data);
-      } else {
-        setError(data.error || 'Something went wrong');
-      }
-    } catch (err) {
-      setError('Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-      />
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative w-full max-w-md bg-card rounded-[2rem] overflow-hidden shadow-2xl p-6 sm:p-8 space-y-6 sm:space-y-8 mx-4"
-      >
-        <div className="text-center space-y-2">
-          <h2 className="text-3xl sm:text-4xl font-display italic text-ink">
-            {mode === 'login' ? 'Welcome Back' : 'Join ItaliaGo'}
-          </h2>
-          <p className="text-ink/60 text-sm">
-            {mode === 'login' ? 'Sign in to access your luxury travel suite.' : 'Create an account for exclusive Italian experiences.'}
-          </p>
-        </div>
-
-        <div className="flex p-1 bg-paper rounded-full">
-          <button 
-            onClick={() => setMode('login')}
-            className={`flex-1 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${mode === 'login' ? 'bg-card shadow-sm text-ink' : 'text-ink/40'}`}
-          >
-            Login
-          </button>
-          <button 
-            onClick={() => setMode('register')}
-            className={`flex-1 py-2 rounded-full text-xs font-bold uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-card shadow-sm text-ink' : 'text-ink/40'}`}
-          >
-            Register
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === 'register' && (
-            <div className="relative">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
-              <input 
-                type="text" 
-                placeholder="Full Name" 
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink transition-all" 
-              />
-            </div>
-          )}
-          <div className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
-            <input 
-              type="email" 
-              placeholder="Email Address" 
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink transition-all" 
-            />
-          </div>
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-ink/20" size={18} />
-            <input 
-              type="password" 
-              placeholder="Password" 
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-paper/50 border-none rounded-2xl pl-12 pr-4 py-4 outline-none focus:ring-1 focus:ring-gold text-ink transition-all" 
-            />
-          </div>
-
-          {error && <p className="text-red-500 text-xs text-center font-medium">{error}</p>}
-
-          <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full btn-luxury py-4 flex items-center justify-center gap-3"
-          >
-            {loading ? (
-              <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-              />
-            ) : (
-              mode === 'login' ? 'Sign In' : 'Create Account'
-            )}
-          </button>
-        </form>
-
-        <button 
-          onClick={onClose}
-          className="w-full text-xs font-bold uppercase tracking-widest text-ink/40 hover:text-ink transition-colors"
-        >
-          Cancel
-        </button>
-      </motion.div>
-    </div>
-  );
-}
 

@@ -32,11 +32,13 @@ const CheckoutView: React.FC<CheckoutViewProps> = ({ basket, basketTotal, onPaym
     try {
       for (const item of basket) {
         await createBooking({
-          type: item.type || 'experience',
-          itemId: item.id,
-          itemName: item.name,
+          type: (item.type || 'experience') as any,
+          listing_id: item.id,
+          listing_type: item.type || 'experience',
+          item_name: item.name,
           amount: item.price,
           details: `${item.location} - ${item.duration || 'Booking'}`,
+          date: new Date().toISOString().split('T')[0], // Default date if missing
         });
         // Mock bonus calculation for now since we're using client-side createBooking
         totalBonus += Math.floor(item.price * 0.15);

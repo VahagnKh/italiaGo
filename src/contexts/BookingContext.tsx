@@ -2,23 +2,12 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-
-interface Booking {
-  id: string;
-  userId: string;
-  type: 'hotel' | 'restaurant' | 'experience' | 'tour' | 'rental' | 'taxi' | 'event';
-  itemId: string;
-  itemName: string;
-  amount: number;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  createdAt: any;
-  details?: any;
-}
+import { Booking } from '../types';
 
 interface BookingContextType {
   bookings: Booking[];
   loading: boolean;
-  createBooking: (bookingData: Omit<Booking, 'id' | 'userId' | 'status' | 'createdAt'> & { status?: Booking['status'] }) => Promise<void>;
+  createBooking: (bookingData: Omit<Booking, 'id' | 'user_id' | 'status' | 'created_at'> & { status?: Booking['status'] }) => Promise<void>;
   cancelBooking: (bookingId: string) => Promise<void>;
 }
 
@@ -38,8 +27,8 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     const q = query(
       collection(db, 'bookings'),
-      where('userId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('user_id', '==', user.uid),
+      orderBy('created_at', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -57,21 +46,24 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => unsubscribe();
   }, [user]);
 
-  const createBooking = async (bookingData: Omit<Booking, 'id' | 'userId' | 'status' | 'createdAt'> & { status?: Booking['status'] }) => {
+  const createBooking = async (bookingData: Omit<Booking, 'id' | 'user_id' | 'status' | 'created_at'> & { status?: Booking['status'] }) => {
     if (!user) throw new Error("User must be logged in to book");
 
     const { status, ...rest } = bookingData;
 
     await addDoc(collection(db, 'bookings'), {
       ...rest,
-      userId: user.uid,
+      user_id: user.uid,
       status: status || 'pending',
-      createdAt: serverTimestamp()
+      created_at: serverTimestamp()
     });
   };
 
   const cancelBooking = async (bookingId: string) => {
-    await deleteDoc(doc(db, 'bookings', bookingId));
+    const { updateDoc, doc } = await import('firebase/firestore');
+    await updateDoc(doc(db, 'bookings', bookingId), {
+      status: 'cancelled'
+    });
   };
 
   return (
