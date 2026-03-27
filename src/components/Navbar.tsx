@@ -38,7 +38,6 @@ const Navbar: React.FC<NavbarProps> = ({ onAuthClick, onAIClick, onAdminClick, s
   }, []);
 
   const navLinks = [
-    { name: 'Home', path: '/', view: 'home' },
     { name: 'Discover', path: '/discover', view: 'discover' },
     { name: t.hotels, path: '/hotels', view: 'hotels' },
     { name: t.restaurants, path: '/restaurants', view: 'restaurants' },

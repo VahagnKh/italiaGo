@@ -1,6 +1,6 @@
 export interface AppUser {
   uid: string;
-  id?: string;
+  id?: string; // Some parts use id instead of uid
   email: string;
   name: string;
   role: 'user' | 'admin';
@@ -10,15 +10,13 @@ export interface AppUser {
   avatar_url?: string;
   status?: string;
   last_game_win?: string;
-  disabled?: number;
-  created_at?: any;
 }
 
 export interface Favorite {
   id: string;
-  user_id: string;
-  item_id: string;
-  item_type: string;
+  userId: string;
+  itemId: string;
+  itemType: string;
   name: string;
   image_url: string;
   location: string;
@@ -27,17 +25,13 @@ export interface Favorite {
 
 export interface Booking {
   id: string;
-  user_id: string;
+  userId: string;
   type: 'hotel' | 'restaurant' | 'tour' | 'taxi' | 'experience' | 'rental' | 'event';
-  listing_id: string;
-  listing_type: string;
-  item_name: string;
+  itemId: string;
+  itemName: string;
   amount: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  created_at: any;
-  date: string;
-  time?: string;
-  guests?: number;
+  createdAt: any;
   details?: any;
 }
 

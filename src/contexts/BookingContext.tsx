@@ -2,12 +2,24 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db, auth } from '../lib/firebase';
 import { collection, addDoc, query, where, onSnapshot, orderBy, serverTimestamp, deleteDoc, doc } from 'firebase/firestore';
 import { useAuth } from './AuthContext';
-import { Booking } from '../types';
+
+interface Booking {
+  id: string;
+  user_id: string;
+  type: 'hotel' | 'restaurant' | 'experience' | 'tour' | 'rental' | 'taxi' | 'event';
+  listing_id: string;
+  listing_type: string;
+  item_name: string;
+  amount: number;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  created_at: any;
+  details?: any;
+}
 
 interface BookingContextType {
   bookings: Booking[];
   loading: boolean;
-  createBooking: (bookingData: Omit<Booking, 'id' | 'user_id' | 'status' | 'created_at'> & { status?: Booking['status'] }) => Promise<void>;
+  createBooking: (bookingData: Omit<Booking, 'id' | 'userId' | 'status' | 'createdAt'> & { status?: Booking['status'] }) => Promise<void>;
   cancelBooking: (bookingId: string) => Promise<void>;
 }
 
@@ -46,7 +58,7 @@ export const BookingProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => unsubscribe();
   }, [user]);
 
-  const createBooking = async (bookingData: Omit<Booking, 'id' | 'user_id' | 'status' | 'created_at'> & { status?: Booking['status'] }) => {
+  const createBooking = async (bookingData: Omit<Booking, 'id' | 'userId' | 'status' | 'createdAt'> & { status?: Booking['status'] }) => {
     if (!user) throw new Error("User must be logged in to book");
 
     const { status, ...rest } = bookingData;

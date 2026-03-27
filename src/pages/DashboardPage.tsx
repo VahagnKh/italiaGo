@@ -200,13 +200,13 @@ export const DashboardOverview: React.FC = () => {
                           {booking.type === 'tour' && <Compass size={14} />}
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-ink">{booking.item_name}</p>
+                          <p className="font-bold text-sm text-ink">{booking.itemName}</p>
                           <p className="text-[10px] text-ink/40 uppercase tracking-widest">{booking.type}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-ink/60">
-                      {booking.created_at?.toDate ? booking.created_at.toDate().toLocaleDateString() : (booking.created_at ? new Date(booking.created_at).toLocaleDateString() : 'Pending')}
+                      {booking.createdAt?.toDate ? booking.createdAt.toDate().toLocaleDateString() : 'Pending'}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
@@ -268,7 +268,7 @@ export const DashboardOverview: React.FC = () => {
                 </div>
                 <h3 className="text-2xl font-display italic text-ink">Cancel Taxi Ride?</h3>
                 <p className="text-sm text-ink/60">
-                  Are you sure you want to cancel your ride for <span className="font-bold text-ink">{cancellingBooking.item_name}</span>? This action cannot be undone.
+                  Are you sure you want to cancel your ride for <span className="font-bold text-ink">{cancellingBooking.itemName}</span>? This action cannot be undone.
                 </p>
               </div>
 

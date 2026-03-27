@@ -11,6 +11,24 @@ import cors from "cors";
 import Stripe from "stripe";
 import admin from "firebase-admin";
 
+import { initializeApp, getApps } from "firebase/app";
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  getDocs, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  limit, 
+  orderBy, 
+  addDoc, 
+  writeBatch,
+  deleteDoc,
+  Timestamp
+} from "firebase/firestore";
 import firebaseConfig from "./firebase-applet-config.json" assert { type: "json" };
 
 // Initialize Firebase Admin SDK
@@ -20,10 +38,11 @@ if (!admin.apps.length) {
   });
 }
 
-// Correctly initialize Firestore with the specific database ID
-const firestore = admin.app().firestore(firebaseConfig.firestoreDatabaseId);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_mock");
-// Using the specific database ID from the config to avoid NOT_FOUND errors
+
+// Initialize Firebase Client SDK
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const firestore = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 declare module "express-session" {
   interface SessionData {
@@ -52,8 +71,8 @@ async function startServer() {
     };
     
     try {
-      const docRef = firestore.collection('notifications').doc();
-      await docRef.set({ id: docRef.id, ...notification });
+      const docRef = doc(collection(firestore, 'notifications'));
+      await setDoc(docRef, { id: docRef.id, ...notification });
       
       const wsMessage = JSON.stringify({ type: 'notification', notification: { id: docRef.id, ...notification }, details });
       adminClients.forEach(client => {
@@ -154,14 +173,14 @@ async function startServer() {
       const decodedToken = await admin.auth().verifyIdToken(token);
       
       // Fetch user data from Firestore to get the role
-      const userDoc = await firestore.collection('users').doc(decodedToken.uid).get();
-      const userData = userDoc.exists ? userDoc.data() : null;
+      const userDoc = await getDoc(doc(firestore, 'users', decodedToken.uid));
+      const userData = userDoc.exists() ? userDoc.data() : null;
       
       req.user = {
         id: decodedToken.uid,
         email: decodedToken.email,
         name: decodedToken.name || userData?.name,
-        role: (decodedToken.email === 'ekyuregh@gmail.com') ? 'admin' : (userData?.role || 'user')
+        role: (decodedToken.email === 'ekyuregh@gmail.com' && decodedToken.email_verified) ? 'admin' : (userData?.role || 'user')
       };
       next();
     } catch (err: any) {
@@ -183,8 +202,8 @@ async function startServer() {
     const user = req.user;
     if (user && req.method !== 'GET' && !req.path.startsWith('/api/admin')) {
       try {
-        const logRef = firestore.collection('activity_logs').doc();
-        await logRef.set({
+        const logRef = doc(collection(firestore, 'activity_logs'));
+        await setDoc(logRef, {
           id: logRef.id,
           user_id: user.id,
           action: req.method,
@@ -217,8 +236,8 @@ async function startServer() {
       });
       
       // Create user in Firestore
-      const userRef = firestore.collection('users').doc(userRecord.uid);
-      await userRef.set({
+      const userRef = doc(firestore, 'users', userRecord.uid);
+      await setDoc(userRef, {
         id: userRecord.uid,
         email,
         name,
@@ -241,8 +260,8 @@ async function startServer() {
   
   app.get("/api/users/me", authenticateToken, async (req: any, res) => {
     try {
-      const userDoc = await firestore.collection('users').doc(req.user.id).get();
-      if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+      const userDoc = await getDoc(doc(firestore, 'users', req.user.id));
+      if (!userDoc.exists()) return res.status(404).json({ error: "User not found" });
       const { password: _, ...user } = userDoc.data() as any;
       res.json(user);
     } catch (error) {
@@ -252,8 +271,8 @@ async function startServer() {
 
   app.get("/api/user", authenticateToken, async (req: any, res) => {
     try {
-      const userDoc = await firestore.collection('users').doc(req.user.id).get();
-      if (!userDoc.exists) return res.status(404).json({ error: "User not found" });
+      const userDoc = await getDoc(doc(firestore, 'users', req.user.id));
+      if (!userDoc.exists()) return res.status(404).json({ error: "User not found" });
       const { password: _, ...user } = userDoc.data() as any;
       res.json(user);
     } catch (error) {
@@ -264,15 +283,17 @@ async function startServer() {
   // Firestore Listings Fetcher
   const fetchListings = async (collectionName: string, type: string) => {
     try {
-      const snapshot = await firestore.collection(collectionName).get();
+      const snapshot = await getDocs(collection(firestore, collectionName));
       const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       // Fetch reviews for each item to calculate average rating
       const listingsWithRatings = await Promise.all(items.map(async (item: any) => {
-        const reviewsSnapshot = await firestore.collection('reviews')
-          .where('listing_id', '==', item.id)
-          .where('listing_type', '==', type)
-          .get();
+        const q = query(
+          collection(firestore, 'reviews'),
+          where('listing_id', '==', item.id),
+          where('listing_type', '==', type)
+        );
+        const reviewsSnapshot = await getDocs(q);
         
         const reviews = reviewsSnapshot.docs.map(doc => doc.data());
         const avgRating = reviews.length > 0 
@@ -310,15 +331,17 @@ async function startServer() {
     
     try {
       for (const col of collections) {
-        const docRef = firestore.collection(col).doc(id);
-        const docSnap = await docRef.get();
-        if (docSnap.exists) {
+        const docRef = doc(firestore, col, id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
           const data = docSnap.data();
           
           // Fetch reviews
-          const reviewsSnapshot = await firestore.collection('reviews')
-            .where('listing_id', '==', id)
-            .get();
+          const q = query(
+            collection(firestore, 'reviews'),
+            where('listing_id', '==', id)
+          );
+          const reviewsSnapshot = await getDocs(q);
           const reviews = reviewsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           
           return res.json({ id: docSnap.id, ...data, reviews, category: col });
@@ -451,9 +474,9 @@ async function startServer() {
 
     try {
       for (const [collectionName, items] of Object.entries(seedData)) {
-        const colRef = firestore.collection(collectionName);
+        const colRef = collection(firestore, collectionName);
         for (const item of items) {
-          await colRef.add(item);
+          await addDoc(colRef, item);
         }
       }
       res.json({ message: "Seed completed successfully!" });
@@ -484,7 +507,7 @@ async function startServer() {
     const finalId = listing_id || itemId;
     const finalType = listing_type || type;
     try {
-      const reviewRef = firestore.collection('reviews').doc();
+      const reviewRef = doc(collection(firestore, 'reviews'));
       const newReview = {
         id: reviewRef.id,
         user_id: req.user.id,
@@ -496,7 +519,7 @@ async function startServer() {
         user_name: req.user.name || 'Anonymous',
         created_at: new Date().toISOString()
       };
-      await reviewRef.set(newReview);
+      await setDoc(reviewRef, newReview);
       res.json(newReview);
     } catch (e: any) {
       console.error("Review Post Error:", e);
@@ -507,11 +530,13 @@ async function startServer() {
   app.get("/api/reviews/:itemId", async (req, res) => {
     const { type } = req.query;
     try {
-      const snapshot = await firestore.collection('reviews')
-        .where('listing_id', '==', req.params.itemId)
-        .where('listing_type', '==', type)
-        .orderBy('created_at', 'desc')
-        .get();
+      const q = query(
+        collection(firestore, 'reviews'),
+        where('listing_id', '==', req.params.itemId),
+        where('listing_type', '==', type),
+        orderBy('created_at', 'desc')
+      );
+      const snapshot = await getDocs(q);
       const reviews = snapshot.docs.map(doc => doc.data());
       res.json(reviews);
     } catch (e: any) {
@@ -525,7 +550,7 @@ async function startServer() {
     const finalId = listing_id || itemId;
     const finalType = listing_type || type;
     try {
-      const bookingRef = firestore.collection('bookings').doc();
+      const bookingRef = doc(collection(firestore, 'bookings'));
       const newBooking = {
         id: bookingRef.id,
         user_id: req.user.id,
@@ -537,7 +562,7 @@ async function startServer() {
         status: 'pending',
         created_at: new Date().toISOString()
       };
-      await bookingRef.set(newBooking);
+      await setDoc(bookingRef, newBooking);
       res.json(newBooking);
     } catch (e: any) {
       console.error("Booking Post Error:", e);
@@ -548,9 +573,10 @@ async function startServer() {
   // Admin Panel
   app.get("/api/admin/stats", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const usersSnapshot = await firestore.collection('users').get();
-      const bookingsSnapshot = await firestore.collection('bookings').get();
-      const confirmedBookings = await firestore.collection('bookings').where('status', '==', 'confirmed').get();
+      const usersSnapshot = await getDocs(collection(firestore, 'users'));
+      const bookingsSnapshot = await getDocs(collection(firestore, 'bookings'));
+      const q = query(collection(firestore, 'bookings'), where('status', '==', 'confirmed'));
+      const confirmedBookings = await getDocs(q);
       
       const users = usersSnapshot.size;
       const bookings = bookingsSnapshot.size;
@@ -565,10 +591,8 @@ async function startServer() {
 
   app.get("/api/admin/notifications", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('notifications')
-        .orderBy('created_at', 'desc')
-        .limit(50)
-        .get();
+      const q = query(collection(firestore, 'notifications'), orderBy('created_at', 'desc'), limit(50));
+      const snapshot = await getDocs(q);
       const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(notifications);
     } catch (error) {
@@ -579,8 +603,9 @@ async function startServer() {
 
   app.post("/api/admin/notifications/read", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('notifications').where('read', '==', 0).get();
-      const batch = firestore.batch();
+      const q = query(collection(firestore, 'notifications'), where('read', '==', 0));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(firestore);
       snapshot.docs.forEach(doc => {
         batch.update(doc.ref, { read: 1 });
       });
@@ -594,11 +619,12 @@ async function startServer() {
 
   app.get("/api/admin/bookings", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('bookings').orderBy('created_at', 'desc').get();
+      const q = query(collection(firestore, 'bookings'), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(q);
       const bookings = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
         const booking = docSnapshot.data() as any;
-        const userDoc = await firestore.collection('users').doc(booking.user_id).get();
-        const userData = (userDoc.exists ? userDoc.data() : {}) as any;
+        const userDoc = await getDoc(doc(firestore, 'users', booking.user_id));
+        const userData = (userDoc.exists() ? userDoc.data() : {}) as any;
         return {
           ...booking,
           user_name: userData.name || 'Unknown',
@@ -616,7 +642,7 @@ async function startServer() {
     try {
       const collectionsList = ['tours', 'restaurants', 'hotels', 'taxi', 'experiences', 'rentals', 'events'];
       const results = await Promise.all(collectionsList.map(async (col) => {
-        const snapshot = await firestore.collection(col).get();
+        const snapshot = await getDocs(collection(firestore, col));
         return snapshot.docs.map(doc => ({ ...doc.data(), type: col.slice(0, -1) }));
       }));
       res.json(results.flat());
@@ -629,7 +655,7 @@ async function startServer() {
   // Learning Platform Routes
   app.get("/api/courses", async (req, res) => {
     try {
-      const snapshot = await firestore.collection('courses').get();
+      const snapshot = await getDocs(collection(firestore, 'courses'));
       const courses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(courses);
     } catch (error) {
@@ -639,12 +665,11 @@ async function startServer() {
 
   app.get("/api/courses/:id", async (req, res) => {
     try {
-      const courseDoc = await firestore.collection('courses').doc(req.params.id).get();
-      if (!courseDoc.exists) return res.status(404).json({ error: "Course not found" });
+      const courseDoc = await getDoc(doc(firestore, 'courses', req.params.id));
+      if (!courseDoc.exists()) return res.status(404).json({ error: "Course not found" });
       
-      const lessonsSnapshot = await firestore.collection('courses').doc(req.params.id).collection('lessons')
-        .orderBy('order_index', 'asc')
-        .get();
+      const q = query(collection(firestore, 'courses', req.params.id, 'lessons'), orderBy('order_index', 'asc'));
+      const lessonsSnapshot = await getDocs(q);
       const lessons = lessonsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       res.json({ id: courseDoc.id, ...courseDoc.data(), lessons });
@@ -655,9 +680,8 @@ async function startServer() {
 
   app.get("/api/user/progress", authenticateToken, async (req: any, res) => {
     try {
-      const snapshot = await firestore.collection('user_progress')
-        .where('user_id', '==', req.user.id)
-        .get();
+      const q = query(collection(firestore, 'user_progress'), where('user_id', '==', req.user.id));
+      const snapshot = await getDocs(q);
       const progress = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(progress);
     } catch (error) {
@@ -669,15 +693,11 @@ async function startServer() {
   // Messages
   app.get("/api/messages", authenticateToken, async (req: any, res) => {
     try {
-      const snapshot = await firestore.collection('messages')
-        .where('receiver_id', '==', req.user.id)
-        .orderBy('created_at', 'desc')
-        .get();
+      const qReceived = query(collection(firestore, 'messages'), where('receiver_id', '==', req.user.id), orderBy('created_at', 'desc'));
+      const snapshot = await getDocs(qReceived);
       
-      const sentSnapshot = await firestore.collection('messages')
-        .where('sender_id', '==', req.user.id)
-        .orderBy('created_at', 'desc')
-        .get();
+      const qSent = query(collection(firestore, 'messages'), where('sender_id', '==', req.user.id), orderBy('created_at', 'desc'));
+      const sentSnapshot = await getDocs(qSent);
         
       const messages = [...snapshot.docs, ...sentSnapshot.docs]
         .map(doc => ({ id: doc.id, ...doc.data() as any }))
@@ -692,8 +712,8 @@ async function startServer() {
   app.post("/api/messages", authenticateToken, async (req: any, res) => {
     const { receiverId, content } = req.body;
     try {
-      const messageRef = firestore.collection('messages').doc();
-      await messageRef.set({
+      const messageRef = doc(collection(firestore, 'messages'));
+      await setDoc(messageRef, {
         id: messageRef.id,
         sender_id: req.user.id,
         receiver_id: receiverId,
@@ -709,7 +729,7 @@ async function startServer() {
   // Admin Panel Extended
   app.get("/api/admin/users", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('users').get();
+      const snapshot = await getDocs(collection(firestore, 'users'));
       const users = snapshot.docs.map(doc => {
         const data = doc.data();
         const { password: _, ...user } = data as any;
@@ -733,8 +753,8 @@ async function startServer() {
         displayName: name,
       });
       
-      const userRef = firestore.collection('users').doc(userRecord.uid);
-      await userRef.set({
+      const userRef = doc(firestore, 'users', userRecord.uid);
+      await setDoc(userRef, {
         id: userRecord.uid,
         email,
         name,
@@ -756,7 +776,7 @@ async function startServer() {
   app.post("/api/admin/users/:id/status", authenticateToken, isAdminMiddleware, async (req, res) => {
     const { disabled } = req.body;
     try {
-      await firestore.collection('users').doc(req.params.id).update({ disabled: disabled ? 1 : 0 });
+      await updateDoc(doc(firestore, 'users', req.params.id), { disabled: disabled ? 1 : 0 });
       await logAdminAction((req as any).user.uid, (req as any).user.name || 'Admin', 'update_user_status', req.params.id, { disabled });
       res.json({ success: true });
     } catch (error) {
@@ -767,7 +787,7 @@ async function startServer() {
   app.post("/api/admin/users/:id/role", authenticateToken, isAdminMiddleware, async (req, res) => {
     const { role } = req.body;
     try {
-      await firestore.collection('users').doc(req.params.id).update({ role });
+      await updateDoc(doc(firestore, 'users', req.params.id), { role });
       await logAdminAction((req as any).user.uid, (req as any).user.name || 'Admin', 'update_user_role', req.params.id, { role });
       res.json({ success: true });
     } catch (error) {
@@ -799,11 +819,11 @@ async function startServer() {
 
     try {
       if (id) {
-        await firestore.collection(collectionName).doc(id).update(data);
+        await updateDoc(doc(firestore, collectionName, id), data);
         await logAdminAction((req as any).user.uid, (req as any).user.name || 'Admin', 'update_listing', id, { type });
       } else {
-        const docRef = firestore.collection(collectionName).doc();
-        await docRef.set({ id: docRef.id, ...data, createdAt: new Date().toISOString() });
+        const docRef = doc(collection(firestore, collectionName));
+        await setDoc(docRef, { id: docRef.id, ...data, createdAt: new Date().toISOString() });
         await logAdminAction((req as any).user.uid, (req as any).user.name || 'Admin', 'create_listing', docRef.id, { type });
       }
       res.json({ success: true });
@@ -814,15 +834,13 @@ async function startServer() {
 
   app.get("/api/admin/logs", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('activity_logs')
-        .orderBy('created_at', 'desc')
-        .limit(100)
-        .get();
+      const q = query(collection(firestore, 'activity_logs'), orderBy('created_at', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
       
       const logs = await Promise.all(snapshot.docs.map(async (logDoc) => {
         const log = logDoc.data() as any;
-        const userDoc = await firestore.collection('users').doc(log.user_id).get();
-        const userData = (userDoc.exists ? userDoc.data() : {}) as any;
+        const userDoc = await getDoc(doc(firestore, 'users', log.user_id));
+        const userData = (userDoc.exists() ? userDoc.data() : {}) as any;
         return {
           ...log,
           user_name: userData.name || 'Unknown',
@@ -837,7 +855,7 @@ async function startServer() {
 
   const logAdminAction = async (adminId: string, adminName: string, action: string, target: string, details: any = {}) => {
     try {
-      await firestore.collection('admin_logs').add({
+      await addDoc(collection(firestore, 'admin_logs'), {
         admin_id: adminId,
         admin_name: adminName,
         action,
@@ -850,10 +868,9 @@ async function startServer() {
 
   app.get("/api/admin/logs/admin", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('admin_logs')
-        .orderBy('created_at', 'desc')
-        .limit(100)
-        .get();
+      const logsRef = collection(firestore, 'admin_logs');
+      const q = query(logsRef, orderBy('created_at', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
       const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       res.json(logs);
     } catch (error: any) {
@@ -863,19 +880,17 @@ async function startServer() {
 
   app.get("/api/admin/logs/activity", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('activity_logs')
-        .orderBy('created_at', 'desc')
-        .limit(100)
-        .get();
+      const q = query(collection(firestore, 'activity_logs'), orderBy('created_at', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
       
       const logs = await Promise.all(snapshot.docs.map(async (logDoc) => {
         const log = logDoc.data() as any;
-        const userDoc = await firestore.collection('users').doc(log.user_id).get();
-        const userData = userDoc.exists ? userDoc.data() : {};
+        const userDoc = await getDoc(doc(firestore, 'users', log.user_id));
+        const userData = userDoc.data() || {};
         return {
           ...log,
-          user_name: (userData as any).name || 'Unknown',
-          user_email: (userData as any).email || 'Unknown'
+          user_name: userData.name || 'Unknown',
+          user_email: userData.email || 'Unknown'
         };
       }));
       res.json(logs);
@@ -886,10 +901,8 @@ async function startServer() {
 
   app.get("/api/admin/analytics/activity", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('activity_logs')
-        .orderBy('created_at', 'desc')
-        .limit(100)
-        .get();
+      const q = query(collection(firestore, 'activity_logs'), orderBy('created_at', 'desc'), limit(100));
+      const snapshot = await getDocs(q);
       const logs = snapshot.docs.map(doc => doc.data());
       
       // Group by date for stats
@@ -908,13 +921,11 @@ async function startServer() {
 
   app.get("/api/admin/messages", authenticateToken, isAdminMiddleware, async (req, res) => {
     try {
-      const snapshot = await firestore.collection('admin_messages')
-        .orderBy('created_at', 'asc')
-        .limit(100)
-        .get();
+      const q = query(collection(firestore, 'admin_messages'), orderBy('created_at', 'asc'), limit(100));
+      const snapshot = await getDocs(q);
       const messages = await Promise.all(snapshot.docs.map(async (docSnapshot) => {
         const msg = docSnapshot.data() as any;
-        const userDoc = await firestore.collection('users').doc(msg.sender_id).get();
+        const userDoc = await getDoc(doc(firestore, 'users', msg.sender_id));
         return { ...msg, sender_name: userDoc.data()?.name || 'Unknown', avatar_url: userDoc.data()?.avatar_url };
       }));
       res.json(messages);
@@ -926,16 +937,16 @@ async function startServer() {
   app.post("/api/admin/messages", authenticateToken, isAdminMiddleware, async (req: any, res) => {
     const { message } = req.body;
     try {
-      const msgRef = firestore.collection('admin_messages').doc();
+      const msgRef = doc(collection(firestore, 'admin_messages'));
       const newMessage = {
         id: msgRef.id,
         sender_id: req.user.id,
         message,
         created_at: new Date().toISOString()
       };
-      await msgRef.set(newMessage);
+      await setDoc(msgRef, newMessage);
       
-      const userDoc = await firestore.collection('users').doc(req.user.id).get();
+      const userDoc = await getDoc(doc(firestore, 'users', req.user.id));
       const messageWithUser = { ...newMessage, sender_name: userDoc.data()?.name || 'Unknown', avatar_url: userDoc.data()?.avatar_url };
       
       // Broadcast to other admins
@@ -960,7 +971,7 @@ async function startServer() {
     if (!collectionName) return res.status(400).json({ error: "Invalid type" });
     
     try {
-      await firestore.collection(collectionName).doc(id).delete();
+      await deleteDoc(doc(firestore, collectionName, id));
       await logAdminAction((req as any).user.uid, (req as any).user.name || 'Admin', 'delete_listing', id, { type });
       notifyAdmins('system', `Listing ID ${id} was deleted by ${(req as any).user.name}`);
       res.json({ success: true });
@@ -982,13 +993,13 @@ async function startServer() {
   app.post("/api/redeem", authenticateToken, async (req: any, res) => {
     const { offerId, cost } = req.body;
     try {
-      const userRef = firestore.collection('users').doc(req.user.id);
-      const userDoc = await userRef.get();
+      const userRef = doc(firestore, 'users', req.user.id);
+      const userDoc = await getDoc(userRef);
       const userData = userDoc.data() as any;
       
       if (!userData || userData.bonus < cost) return res.status(400).json({ error: "Insufficient points" });
       
-      await userRef.update({ bonus: userData.bonus - cost });
+      await updateDoc(userRef, { bonus: userData.bonus - cost });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to redeem offer" });
@@ -997,10 +1008,10 @@ async function startServer() {
 
   app.post("/api/game-win", authenticateToken, async (req: any, res) => {
     try {
-      const userRef = firestore.collection('users').doc(req.user.id);
-      const userDoc = await userRef.get();
+      const userRef = doc(firestore, 'users', req.user.id);
+      const userDoc = await getDoc(userRef);
       const userData = userDoc.data() as any;
-      await userRef.update({ 
+      await updateDoc(userRef, { 
         last_game_win: new Date().toISOString(), 
         bonus: (userData?.bonus || 0) + 50 
       });
@@ -1013,8 +1024,8 @@ async function startServer() {
   app.post("/api/log-activity", authenticateToken, async (req: any, res) => {
     const { action, page, details } = req.body;
     try {
-      const logRef = firestore.collection('activity_logs').doc();
-      await logRef.set({
+      const logRef = doc(collection(firestore, 'activity_logs'));
+      await setDoc(logRef, {
         id: logRef.id,
         user_id: req.user.id,
         action: action || 'UI_ACTION',
@@ -1031,15 +1042,7 @@ async function startServer() {
   });
 
   // Social & Learning Extras
-  app.get("/api/friends", authenticateToken, (req, res) => {
-    const mockFriends = [
-      { id: 'f1', name: 'Marco Rossi', avatar: 'https://i.pravatar.cc/150?u=marco', status: 'online', level: 12 },
-      { id: 'f2', name: 'Giulia Bianchi', avatar: 'https://i.pravatar.cc/150?u=giulia', status: 'away', level: 8 },
-      { id: 'f3', name: 'Alessandro Verdi', avatar: 'https://i.pravatar.cc/150?u=alessandro', status: 'offline', level: 25 },
-      { id: 'f4', name: 'Sofia Neri', avatar: 'https://i.pravatar.cc/150?u=sofia', status: 'online', level: 5 }
-    ];
-    res.json(mockFriends);
-  });
+  app.get("/api/friends", authenticateToken, (req, res) => res.json([]));
   app.get("/api/mentors", authenticateToken, (req, res) => res.json([]));
   app.post("/api/mentors/follow", authenticateToken, (req, res) => res.json({ success: true }));
   app.get("/api/tasks", authenticateToken, (req, res) => res.json([]));
@@ -1067,12 +1070,12 @@ async function startServer() {
   app.post("/api/user/profile", authenticateToken, async (req: any, res) => {
     const { name, avatar_url } = req.body;
     try {
-      const userRef = firestore.collection('users').doc(req.user.id);
-      await userRef.update({
+      const userRef = doc(firestore, 'users', req.user.id);
+      await updateDoc(userRef, {
         name,
         avatar_url
       });
-      const userDoc = await userRef.get();
+      const userDoc = await getDoc(userRef);
       res.json(userDoc.data());
     } catch (e: any) {
       res.status(500).json({ error: e.message });
@@ -1082,10 +1085,12 @@ async function startServer() {
   // Bookings
   app.get("/api/bookings", authenticateToken, async (req: any, res) => {
     try {
-      const snapshot = await firestore.collection('bookings')
-        .where('user_id', '==', req.user.id)
-        .orderBy('created_at', 'desc')
-        .get();
+      const q = query(
+        collection(firestore, 'bookings'),
+        where('user_id', '==', req.user.id),
+        orderBy('created_at', 'desc')
+      );
+      const snapshot = await getDocs(q);
       const bookings = snapshot.docs.map(doc => doc.data());
       res.json(bookings);
     } catch (error) {
@@ -1095,10 +1100,10 @@ async function startServer() {
 
   app.post("/api/bookings/:id/cancel", authenticateToken, async (req: any, res) => {
     try {
-      const bookingRef = firestore.collection('bookings').doc(req.params.id);
-      const bookingDoc = await bookingRef.get();
+      const bookingRef = doc(firestore, 'bookings', req.params.id);
+      const bookingDoc = await getDoc(bookingRef);
       
-      if (!bookingDoc.exists) {
+      if (!bookingDoc.exists()) {
         return res.status(404).json({ error: "Booking not found" });
       }
       
@@ -1107,7 +1112,7 @@ async function startServer() {
         return res.status(403).json({ error: "Unauthorized" });
       }
       
-      await bookingRef.update({ status: 'cancelled' });
+      await updateDoc(bookingRef, { status: 'cancelled' });
       res.json({ success: true });
     } catch (error) {
       console.error("Booking Cancel Error:", error);
@@ -1138,8 +1143,8 @@ async function startServer() {
     console.error("Client-side error reported:", JSON.stringify(errorData, null, 2));
     
     try {
-      const errorRef = firestore.collection('client_errors').doc();
-      await errorRef.set({
+      const errorRef = doc(collection(firestore, 'client_errors'));
+      await setDoc(errorRef, {
         id: errorRef.id,
         ...errorData,
         created_at: new Date().toISOString(),
@@ -1172,15 +1177,17 @@ async function startServer() {
     if (!collectionName) return res.status(404).json({ error: "Not found" });
     
     try {
-      const docSnapshot = await firestore.collection(collectionName).doc(id).get();
-      if (!docSnapshot.exists) return res.status(404).json({ error: "Not found" });
+      const docSnapshot = await getDoc(doc(firestore, collectionName, id));
+      if (!docSnapshot.exists()) return res.status(404).json({ error: "Not found" });
       
       const item = docSnapshot.data() as any;
-      const reviewsSnapshot = await firestore.collection('reviews')
-        .where('listing_id', '==', id)
-        .where('listing_type', '==', type.slice(0, -1))
-        .orderBy('created_at', 'desc')
-        .get();
+      const q = query(
+        collection(firestore, 'reviews'),
+        where('listing_id', '==', id),
+        where('listing_type', '==', type.slice(0, -1)),
+        orderBy('created_at', 'desc')
+      );
+      const reviewsSnapshot = await getDocs(q);
       const reviews = reviewsSnapshot.docs.map(d => d.data());
       
       res.json({ ...item, reviews });
@@ -1213,7 +1220,8 @@ async function startServer() {
     
     // Test Firestore connection
     try {
-      const testSnapshot = await firestore.collection('hotels').limit(1).get();
+      const q = query(collection(firestore, 'hotels'), limit(1));
+      const testSnapshot = await getDocs(q);
       console.log(`Firestore connection test successful. Found ${testSnapshot.size} hotels.`);
     } catch (e) {
       console.error("Firestore connection test failed:", e);

@@ -30,13 +30,11 @@ const CheckoutPage: React.FC = () => {
       for (const item of basket) {
         await createBooking({
           type: item.type as any,
-          listing_id: item.id,
-          listing_type: item.type,
-          item_name: item.name,
+          itemId: item.id,
+          itemName: item.name,
           details: `${item.location || ''} - ${item.duration || 'Booking'}`,
           amount: item.price,
-          status: 'confirmed',
-          date: new Date().toISOString().split('T')[0],
+          status: 'confirmed'
         });
         // Simplified bonus calculation
         totalBonus += Math.floor(item.price * 0.15);

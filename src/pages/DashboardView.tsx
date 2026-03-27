@@ -14,8 +14,7 @@ import {
   Tag,
   MapPin,
   Clock,
-  ChevronRight,
-  MessageSquare
+  ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -23,7 +22,7 @@ import { useFavorites } from '../contexts/FavoriteContext';
 import TranslatedText from '../components/TranslatedText';
 
 const DashboardView: React.FC = () => {
-  const { user, userData, fetchWithAuth, token } = useAuth();
+  const { user, fetchWithAuth, token } = useAuth();
   const { t, language: lang } = useLanguage();
   const { favorites, toggleFavorite } = useFavorites();
   
@@ -34,32 +33,11 @@ const DashboardView: React.FC = () => {
   const [cancellingBooking, setCancellingBooking] = useState<any | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
-  const [friends, setFriends] = useState<any[]>([]);
-  const [loadingFriends, setLoadingFriends] = useState(false);
 
   // Profile state
-  const [profileName, setProfileName] = useState(userData?.name || user?.displayName || '');
-  const [profileAvatar, setProfileAvatar] = useState(userData?.avatar_url || user?.photoURL || '');
+  const [profileName, setProfileName] = useState(user?.name || '');
+  const [profileAvatar, setProfileAvatar] = useState(user?.avatar_url || '');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-
-  useEffect(() => {
-    const fetchFriends = async () => {
-      setLoadingFriends(true);
-      try {
-        const res = await fetchWithAuth('/api/friends');
-        if (res.ok) {
-          const data = await res.json();
-          setFriends(data);
-        }
-      } catch (err) {
-        console.error('Error fetching friends:', err);
-      } finally {
-        setLoadingFriends(false);
-      }
-    };
-
-    if (user) fetchFriends();
-  }, [user]);
 
   const addNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -123,7 +101,7 @@ const DashboardView: React.FC = () => {
   }
 
   const handleRedeem = async (offer: any) => {
-    if (userData && userData.bonus < offer.discountPoints) {
+    if (user.bonus < offer.discountPoints) {
       addNotification('Insufficient bonus points', 'error');
       return;
     }
@@ -174,17 +152,17 @@ const DashboardView: React.FC = () => {
     <div className="max-w-7xl mx-auto px-6 py-12 space-y-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-4xl text-ink">{t.welcomeBack}, {userData?.name || user.displayName}</h1>
+          <h1 className="text-2xl sm:text-4xl text-ink">{t.welcomeBack}, {user.name}</h1>
           <p className="text-sm sm:text-base text-ink/60">{t.manageBookings}</p>
         </div>
         <div className="flex gap-4">
           <div className="bg-card p-6 rounded-2xl shadow-sm border border-border flex flex-col items-center min-w-[150px]">
             <span className="text-xs font-bold uppercase tracking-widest text-ink/40 mb-1">{t.wallet}</span>
-            <span className="text-2xl font-display text-ink">€{userData?.wallet_balance?.toFixed(2) || '0.00'}</span>
+            <span className="text-2xl font-display text-ink">€{user.wallet_balance?.toFixed(2) || '0.00'}</span>
           </div>
           <div className="bg-card p-6 rounded-2xl shadow-sm border border-border flex flex-col items-center min-w-[150px]">
             <span className="text-xs font-bold uppercase tracking-widest text-ink/40 mb-1">{t.bonus}</span>
-            <span className="text-2xl font-display text-gold">{userData?.bonus || 0}</span>
+            <span className="text-2xl font-display text-gold">{user.bonus || 0}</span>
           </div>
         </div>
       </div>
@@ -232,7 +210,7 @@ const DashboardView: React.FC = () => {
                               <div className="w-10 h-10 rounded-lg bg-paper overflow-hidden">
                                 <img src={booking.image || 'https://picsum.photos/seed/booking/100/100'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                               </div>
-                              <span className="font-bold text-ink">{booking.item_name || booking.title}</span>
+                              <span className="font-bold text-ink">{booking.title}</span>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-sm text-ink/60">{new Date(booking.date).toLocaleDateString()}</td>
@@ -277,7 +255,7 @@ const DashboardView: React.FC = () => {
                 {favorites.map((item) => (
                   <div key={item.id} className="luxury-card group">
                     <div className="h-48 overflow-hidden relative">
-                      <img src={item.image_url || 'https://picsum.photos/seed/fav/400/300'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={item.image_url || item.image || 'https://picsum.photos/seed/fav/400/300'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       <button 
                         onClick={() => toggleFavorite(item)}
                         className="absolute top-4 right-4 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg"
@@ -354,7 +332,7 @@ const DashboardView: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between items-end">
-                  <span className="text-3xl font-display text-gold">{userData?.status || 'Normal'}</span>
+                  <span className="text-3xl font-display text-gold">{user.status}</span>
                   <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">Level 1</span>
                 </div>
                 <div className="h-2 bg-white/10 rounded-full overflow-hidden">
@@ -382,42 +360,6 @@ const DashboardView: React.FC = () => {
                 <p className="text-sm text-ink/40 italic">No recent activity.</p>
               )}
             </div>
-          </div>
-
-          <div className="bg-card rounded-[2.5rem] border border-border p-8 space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-display italic text-ink">Friends</h3>
-              <span className="text-[10px] font-bold uppercase tracking-widest text-gold">{friends.length} Online</span>
-            </div>
-            <div className="space-y-4">
-              {loadingFriends ? (
-                <div className="flex justify-center py-4">
-                  <div className="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : friends.map((friend) => (
-                <div key={friend.id} className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <img src={friend.avatar} className="w-10 h-10 rounded-full object-cover" />
-                      <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-card ${friend.status === 'online' ? 'bg-emerald-500' : friend.status === 'away' ? 'bg-amber-500' : 'bg-gray-400'}`} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-ink">{friend.name}</p>
-                      <p className="text-[10px] text-ink/40 uppercase tracking-widest">Level {friend.level}</p>
-                    </div>
-                  </div>
-                  <button className="p-2 text-ink/20 hover:text-gold transition-colors">
-                    <MessageSquare size={16} />
-                  </button>
-                </div>
-              ))}
-              {friends.length === 0 && !loadingFriends && (
-                <p className="text-sm text-ink/40 italic">No friends found.</p>
-              )}
-            </div>
-            <button className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-ink/40 hover:text-gold transition-colors border-t border-border pt-6">
-              Find More Friends
-            </button>
           </div>
         </div>
       </div>

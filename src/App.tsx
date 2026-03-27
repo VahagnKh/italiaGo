@@ -425,8 +425,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    // If user just logged in and is on a non-home view, ensure they have a valid view
-    if (user && !['overview', 'inbox', 'tasks', 'notifications', 'favorites', 'profile', 'settings', 'home'].includes(view)) {
+    if (user && view === 'home') {
       setView('overview');
     }
   }, [user]);
@@ -517,16 +516,7 @@ export default function App() {
           <button onClick={() => { setView('tours'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'tours' ? 'text-ink' : ''}`}>{t.tours}</button>
           <button onClick={() => { setView('rentals'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'rentals' ? 'text-ink' : ''}`}>{t.rentals}</button>
           <button onClick={() => { setView('events'); setInitialFilter('all'); setInitialPriceFilter('all'); setInitialSearch(''); }} className={`hover:text-ink transition-colors ${view === 'events' ? 'text-ink' : ''}`}>{t.events}</button>
-          {user && (
-            <button 
-              onClick={() => setView('overview')} 
-              className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-accent/80 transition-colors shadow-lg shadow-accent/20"
-            >
-              <LayoutDashboard size={14} />
-              Dashboard
-            </button>
-          )}
-          {(user?.role === 'admin' || user?.name === 'Marco Rossi') && !user && (
+          {(user?.role === 'admin' || user?.name === 'Marco Rossi') && (
             <button 
               onClick={() => setShowAdmin(true)} 
               className="flex items-center gap-2 px-4 py-2 bg-ink text-paper rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gold transition-colors"
@@ -760,15 +750,6 @@ export default function App() {
                           <p className="text-sm font-bold text-ink truncate">{user.email}</p>
                         </div>
                         <div className="p-2">
-                          {user && (
-                            <button 
-                              onClick={() => { setView('overview'); setShowProfileMenu(false); }}
-                              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-ink hover:bg-paper transition-colors"
-                            >
-                              <LayoutDashboard size={16} className="text-accent" />
-                              Dashboard
-                            </button>
-                          )}
                           {user.role === 'admin' && (
                             <button 
                               onClick={() => { setShowAdmin(true); setShowProfileMenu(false); }}
@@ -977,7 +958,7 @@ export default function App() {
 
 function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotification }: { setView: any, t: any, lang: string, setInfoModal: any, setInitialFilter: (f: string) => void, addNotification: (m: string, type?: any) => void }) {
   return (
-    <div className="space-y-32 pb-32">
+    <div className="space-y-20 pb-20">
       {/* Hero */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
         {/* Cinematic Background with Ken Burns */}
@@ -1109,92 +1090,6 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotific
                 <item.icon size={36} />
               </div>
               <h3 className="font-bold text-[11px] uppercase tracking-[0.2em] text-ink group-hover:text-gold transition-colors">{item.label}</h3>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* Signature Experiences - Bento Grid */}
-      <section className="max-w-7xl mx-auto px-6">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center space-y-4 mb-20"
-        >
-          <span className="text-gold font-bold uppercase tracking-[0.5em] text-[10px]">Exclusive Access</span>
-          <h2 className="text-4xl md:text-6xl font-display italic text-ink">Signature Experiences</h2>
-        </motion.div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-8 h-[800px]">
-          <motion.div 
-            whileHover={{ scale: 0.98 }}
-            className="md:col-span-2 md:row-span-2 relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
-          >
-            <img src="https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&q=80&w=1200" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            <div className="absolute bottom-0 p-12 text-white space-y-4">
-              <span className="text-gold font-bold uppercase tracking-widest text-xs">Venetian Dreams</span>
-              <h3 className="text-4xl font-display italic">Private Gondola Serenade</h3>
-              <p className="text-sm opacity-0 group-hover:opacity-80 transition-opacity duration-500 font-light max-w-md">Experience the magic of Venice's hidden canals with a private musician and champagne service.</p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ scale: 0.98 }}
-            className="md:col-span-2 relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
-          >
-            <img src="https://images.unsplash.com/photo-1493246507139-91e8fad9978e?auto=format&fit=crop&q=80&w=1200" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            <div className="absolute bottom-0 p-10 text-white space-y-2">
-              <span className="text-gold font-bold uppercase tracking-widest text-[10px]">Tuscan Heritage</span>
-              <h3 className="text-2xl font-display italic">Vintage Alfa Romeo Tour</h3>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ scale: 0.98 }}
-            className="relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
-          >
-            <img src="https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&q=80&w=800" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            <div className="absolute bottom-0 p-8 text-white">
-              <h3 className="text-xl font-display italic">Amalfi Sunset Yacht</h3>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            whileHover={{ scale: 0.98 }}
-            className="relative rounded-[3rem] overflow-hidden group cursor-pointer shadow-2xl"
-          >
-            <img src="https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&q=80&w=800" className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" referrerPolicy="no-referrer" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-            <div className="absolute bottom-0 p-8 text-white">
-              <h3 className="text-xl font-display italic">Dolomites Helicopter Safari</h3>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="bg-ink py-32">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-16 text-center">
-          {[
-            { label: 'Destinations', value: '150+' },
-            { label: 'Luxury Hotels', value: '450+' },
-            { label: 'Happy Travelers', value: '25k+' },
-            { label: 'Expert Guides', value: '120+' },
-          ].map((stat, i) => (
-            <motion.div 
-              key={i}
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="space-y-4"
-            >
-              <h3 className="text-5xl md:text-7xl font-display italic text-gold">{stat.value}</h3>
-              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-white/40">{stat.label}</p>
             </motion.div>
           ))}
         </div>
@@ -1334,21 +1229,31 @@ function HomeView({ setView, t, lang, setInfoModal, setInitialFilter, addNotific
               referrerPolicy="no-referrer" 
             />
           </motion.div>
+          <div className="absolute inset-0 bg-gradient-to-b from-ink/90 via-ink/40 to-ink/90" />
           
-          <div className="relative z-10 space-y-8">
-            <span className="text-gold font-bold uppercase tracking-[0.5em] text-xs">Stay Inspired</span>
-            <h2 className="text-5xl md:text-7xl font-display italic">Join the Inner Circle</h2>
-            <p className="text-white/60 max-w-xl mx-auto text-lg font-light">Get exclusive travel guides, early access to boutique openings, and curated Italian experiences delivered to your inbox.</p>
+          <div className="relative z-10 space-y-10 max-w-3xl mx-auto">
+             <div className="space-y-6">
+              <span className="text-gold font-bold uppercase tracking-[0.6em] text-[10px]">Exclusive Access</span>
+              <h2 className="text-5xl md:text-8xl font-display italic leading-tight">Join the Inner Circle</h2>
+              <p className="text-white/60 text-xl font-light leading-relaxed">Receive curated travel inspiration, exclusive offers, and early access to our most prestigious experiences.</p>
+            </div>
             
-            <form className="max-w-md mx-auto flex flex-col sm:flex-row gap-4 pt-6" onSubmit={(e) => { e.preventDefault(); addNotification("Welcome to the Inner Circle!", 'success'); }}>
+            <div className="flex flex-col md:flex-row gap-6 pt-6">
               <input 
                 type="email" 
                 placeholder="Your email address" 
-                className="flex-1 bg-white/10 border border-white/20 rounded-full px-8 py-4 text-white placeholder:text-white/30 focus:outline-none focus:border-gold transition-all backdrop-blur-md"
-                required
+                className="flex-1 bg-white/5 border border-white/10 rounded-full px-10 py-6 outline-none focus:ring-2 focus:ring-gold transition-all backdrop-blur-md text-lg" 
               />
-              <button type="submit" className="btn-luxury px-10 py-4">Subscribe</button>
-            </form>
+              <motion.button 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => addNotification('Welcome to the Inner Circle!', 'success')}
+                className="btn-luxury px-16 py-6 text-base"
+              >
+                Subscribe
+              </motion.button>
+            </div>
+            <p className="text-[11px] text-white/30 uppercase tracking-[0.3em]">By subscribing, you agree to our privacy policy.</p>
           </div>
         </motion.div>
       </section>
@@ -2172,7 +2077,6 @@ function DashboardView({ user, t, favorites, onRemoveFavorite, refreshUser, addN
 function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string, setView: (v: any) => void, user: any, setUser: (u: any) => void, setShowAdmin: (s: boolean) => void }) {
   const { t } = useLanguage();
   const menuItems = [
-    { id: 'home', label: 'Main Page', icon: Globe },
     { id: 'overview', label: t.destinations, icon: MapIcon },
     { id: 'inbox', label: t.messages, icon: Mail },
     { id: 'notifications', label: t.notifications, icon: Bell },
@@ -2182,59 +2086,54 @@ function Sidebar({ view, setView, user, setUser, setShowAdmin }: { view: string,
   ];
 
   return (
-    <div className="hidden lg:flex flex-col w-72 bg-white h-full border-r border-gray-100 p-8">
-      <div className="flex items-center gap-3 mb-12 px-2 cursor-pointer" onClick={() => setView('home')}>
-        <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white font-display font-bold">
-          I
+    <div className="hidden lg:flex flex-col w-64 bg-white h-full p-6">
+      <div className="flex items-center gap-3 mb-12 px-4">
+        <div className="w-10 h-10 bg-[#7C3AED] rounded-xl flex items-center justify-center text-white">
+          <Plane size={24} />
         </div>
-        <span className="text-2xl font-display font-bold tracking-tight text-gray-900">Tourvisto</span>
+        <span className="text-xl font-bold tracking-tight text-gray-900">Tourvisto</span>
       </div>
 
-      <div className="space-y-1.5 flex-1">
+      <div className="space-y-2 flex-1">
         {menuItems.map(item => (
           <button
             key={item.id}
             onClick={() => setView(item.id)}
-            className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-widest transition-all ${
-              view === item.id ? 'bg-black text-white shadow-xl shadow-black/10' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-900'
+            className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-medium transition-all ${
+              view === item.id ? 'bg-[#7C3AED] text-white shadow-lg shadow-[#7C3AED]/30' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-600'
             }`}
           >
-            <item.icon size={18} className={view === item.id ? 'text-gold' : ''} />
+            <item.icon size={20} />
             {item.label}
           </button>
         ))}
       </div>
 
-      <div className="mt-auto pt-8 space-y-6">
-        <div className="bg-black text-white rounded-[2rem] p-6 relative overflow-hidden group cursor-pointer">
-          <div className="relative z-10 space-y-3">
-            <div className="w-8 h-8 bg-gold/20 rounded-lg flex items-center justify-center text-gold">
-              <Sparkles size={16} />
-            </div>
-            <div>
-              <p className="text-sm font-display italic">{t.upgradePro}</p>
-              <p className="text-[10px] text-gray-400 leading-relaxed mt-1">{t.upgradeDesc}</p>
-            </div>
-            <button className="text-[10px] font-bold text-gold uppercase tracking-widest hover:underline">{t.learnMore}</button>
+      <div className="mt-auto pt-8 space-y-4">
+        <div className="bg-[#7C3AED]/5 rounded-3xl p-6 relative overflow-hidden group cursor-pointer">
+          <div className="relative z-10 space-y-2">
+            <p className="text-sm font-bold text-gray-900">{t.upgradePro}</p>
+            <p className="text-[10px] text-gray-500 leading-relaxed">{t.upgradeDesc}</p>
+            <button className="mt-2 text-[10px] font-bold text-[#7C3AED] uppercase tracking-widest">{t.learnMore}</button>
           </div>
-          <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-gold/5 rounded-full group-hover:scale-150 transition-transform duration-700" />
+          <div className="absolute -right-4 -bottom-4 w-20 h-20 bg-[#7C3AED]/10 rounded-full group-hover:scale-150 transition-transform duration-500" />
         </div>
 
         <div className="space-y-1">
           {user.role === 'admin' && (
             <button
               onClick={() => setShowAdmin(true)}
-              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-widest text-gold hover:bg-gold/5 transition-all"
+              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium text-gold hover:bg-gold/5 transition-all"
             >
-              <Shield size={18} />
+              <Shield size={20} />
               {t.admin}
             </button>
           )}
           <button
-            onClick={() => { auth.signOut(); setView('home'); }}
-            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold uppercase tracking-widest text-red-500 hover:bg-red-50 transition-all"
+            onClick={() => { setUser(null); setView('home'); }}
+            className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-50 transition-all"
           >
-            <LogOut size={18} />
+            <LogOut size={20} />
             {t.logout}
           </button>
         </div>
@@ -2248,41 +2147,34 @@ function TopBar({ setView, user }: { setView: (v: any) => void, user: any }) {
   const [query, setQuery] = useState('');
 
   return (
-    <header className="bg-white/80 backdrop-blur-md px-8 py-6 flex items-center justify-between sticky top-0 z-30 border-b border-gray-50">
+    <header className="bg-white px-8 py-6 flex items-center justify-between sticky top-0 z-30">
       <div className="flex-1 max-w-xl">
-        <h1 className="text-2xl font-display italic text-gray-900">{t.welcomeBack}, {user.name.split(' ')[0]} 👋</h1>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mt-1">{t.manageBookings}</p>
+        <h1 className="text-2xl font-bold text-gray-900">{t.welcomeBack}, {user.name.split(' ')[0]} 👋</h1>
+        <p className="text-xs text-gray-400 mt-1">{t.manageBookings}</p>
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="relative hidden md:block">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input 
-            type="text" 
-            placeholder="Search your trips..." 
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="bg-gray-50 border-none rounded-2xl pl-12 pr-6 py-3 text-sm w-64 outline-none focus:ring-2 focus:ring-black/5 transition-all"
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <button className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-black transition-colors relative">
-            <Bell size={20} />
-            <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-          </button>
-          <button className="p-3 bg-gray-50 rounded-2xl text-gray-400 hover:text-black transition-colors">
-            <Mail size={20} />
-          </button>
-        </div>
-        <div className="h-10 w-px bg-gray-100" />
-        <button onClick={() => setView('profile')} className="flex items-center gap-3 group">
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-bold text-gray-900 group-hover:text-gold transition-colors">{user.name}</p>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{user.role}</p>
-          </div>
-          <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-white shadow-sm ring-1 ring-gray-100">
-            <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
-          </div>
+      <div className="relative flex-1 max-w-md mx-8">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        <input
+          type="text"
+          placeholder="Search destination, hotel..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="w-full bg-gray-50 border-none rounded-2xl pl-12 pr-4 py-3.5 outline-none focus:ring-2 focus:ring-[#7C3AED]/20 text-sm"
+        />
+      </div>
+
+      <div className="flex items-center gap-4">
+        <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-2xl transition-colors relative">
+          <Bell size={20} />
+          <span className="absolute top-3 right-3 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+        </button>
+        <button className="p-3 text-gray-400 hover:bg-gray-50 rounded-2xl transition-colors">
+          <Mail size={20} />
+        </button>
+        <div className="h-10 w-px bg-gray-100 mx-2" />
+        <button onClick={() => setView('settings')} className="w-12 h-12 rounded-2xl overflow-hidden bg-gray-100 border-2 border-white shadow-sm">
+          <img src={user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`} alt={user.name} className="w-full h-full object-cover" />
         </button>
       </div>
     </header>
@@ -3161,61 +3053,46 @@ function ListView({ items, type, title, t, lang, onAddToBasket, favorites, onTog
           filteredItems.map((item) => (
             <motion.div 
               key={`${item.type}-${item.id}`}
-              whileHover={{ y: -15 }}
+              whileHover={{ y: -10 }}
               className="luxury-card group cursor-pointer"
             >
-              <div className="h-72 overflow-hidden relative">
-                <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
-                <div className="absolute top-6 right-6 flex flex-col gap-3">
-                  <div className="bg-white/90 backdrop-blur px-4 py-1.5 rounded-full flex items-center gap-1 shadow-lg">
+              <div className="h-64 overflow-hidden relative">
+                <img src={item.image || undefined} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute top-4 right-4">
+                  <div className="bg-card/90 backdrop-blur px-3 py-1 rounded-full flex items-center gap-1">
                     {Array.from({ length: item.stars }).map((_, j) => (
                       <Star key={j} size={10} fill="currentColor" className="text-gold" />
                     ))}
                   </div>
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
-                    className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-lg backdrop-blur-md ${
-                      favorites.some(f => f.id === item.id && f.type === item.type) 
-                        ? 'bg-red-500 text-white' 
-                        : 'bg-white/80 text-ink/40 hover:text-red-500'
-                    }`}
-                  >
-                    <Heart size={16} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
-                  </button>
                 </div>
-                <div className="absolute bottom-6 left-6 bg-ink/80 backdrop-blur-md px-4 py-2 rounded-2xl text-white text-[10px] font-bold uppercase tracking-widest shadow-2xl">
-                  {item.category || item.type}
-                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onToggleFavorite(item); }}
+                  className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all z-10 ${
+                    favorites.some(f => f.id === item.id && f.type === item.type) 
+                      ? 'bg-red-500 text-white' 
+                      : 'bg-card/90 backdrop-blur text-ink/40 hover:text-red-500'
+                  }`}
+                >
+                  <Heart size={14} fill={favorites.some(f => f.id === item.id) ? "currentColor" : "none"} />
+                </button>
               </div>
-              <div className="p-8 space-y-6 bg-white">
-                <div className="flex justify-between items-start gap-4">
-                  <div className="space-y-1">
-                    <h3 className="text-xl font-bold text-ink leading-tight group-hover:text-accent transition-colors">{item.name}</h3>
-                    <div className="flex items-center gap-2 text-ink/40 text-xs">
-                      <MapPin size={12} />
-                      <span>{item.location}</span>
-                    </div>
+              <div className="p-6 space-y-4 bg-card">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-xl font-display text-ink">{item.name}</h3>
+                    <p className="text-sm text-ink/60 flex items-center gap-1">
+                      <MapPin size={12} /> {item.location}
+                    </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-ink">${item.price_per_night || item.price}</p>
-                    <p className="text-[9px] font-bold text-ink/30 uppercase tracking-widest">{item.type === 'hotel' ? t.perNight : t.perPerson}</p>
-                  </div>
+                  {item.price && <span className="font-bold text-ink">€{item.price}</span>}
                 </div>
-                <p className="text-xs text-ink/50 leading-relaxed line-clamp-2 italic">
-                  {item.description || "Experience the finest Italian hospitality in a setting of unparalleled beauty and historic charm."}
-                </p>
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-2">
+                  <button onClick={() => setSelectedItem(item)} className="flex-1 btn-outline text-xs py-2">{t.more}</button>
                   <button 
                     onClick={(e) => { e.stopPropagation(); onAddToBasket(item); }}
-                    className="flex-1 btn-luxury py-4"
+                    className="flex-1 btn-luxury text-xs py-2"
                   >
-                    {t.bookNow}
-                  </button>
-                  <button 
-                    onClick={() => setSelectedItem(item)}
-                    className="w-14 h-14 rounded-2xl border border-gray-100 flex items-center justify-center text-ink/40 hover:border-accent hover:text-accent transition-all"
-                  >
-                    <ChevronRight size={20} />
+                    {t.addToBasket}
                   </button>
                 </div>
               </div>
